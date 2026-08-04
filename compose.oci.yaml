@@ -1,0 +1,85 @@
+name: contab-pareja-production
+
+x-app-environment: &app-environment
+  APP_ENV: production
+  DATABASE_URL: postgresql+psycopg://contab:${POSTGRES_PASSWORD:?Define POSTGRES_PASSWORD}@postgres:5432/contab_pareja
+  JWT_SECRET: ${JWT_SECRET:?Define JWT_SECRET}
+  ACCESS_TOKEN_MINUTES: ${ACCESS_TOKEN_MINUTES:-15}
+  REFRESH_TOKEN_DAYS: ${REFRESH_TOKEN_DAYS:-30}
+  FCM_PROJECT_ID: ${FCM_PROJECT_ID:?Define FCM_PROJECT_ID}
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: contab_pareja
+      POSTGRES_USER: contab
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Define POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U contab -d contab_pareja"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+    networks: [private]
+
+  api:
+    image: ${APP_IMAGE:?Define APP_IMAGE}
+    environment: *app-environment
+    command: ["sh", "-c", "alembic upgrade head && exec uvicorn app.main:app --host 0.0.0.0 --port 8000 --proxy-headers --forwarded-allow-ips=*"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/ready', timeout=2)"]
+      interval: 15s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+    networks: [private]
+
+  worker:
+    image: ${APP_IMAGE:?Define APP_IMAGE}
+    environment:
+      <<: *app-environment
+      GOOGLE_APPLICATION_CREDENTIALS: /run/secrets/firebase_credentials
+    command: ["python", "-m", "app.workers.outbox"]
+    secrets: [firebase_credentials]
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+    networks: [private]
+
+  caddy:
+    image: caddy:2.10-alpine
+    environment:
+      DOMAIN: ${DOMAIN:?Define DOMAIN}
+      TLS_EMAIL: ${TLS_EMAIL:?Define TLS_EMAIL}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./deploy/oci/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+    networks: [private]
+
+networks:
+  private:
+
+volumes:
+  postgres_data:
+  caddy_data:
+  caddy_config:
+
+secrets:
+  firebase_credentials:
+    file: ./secrets/firebase-service-account.json

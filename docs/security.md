@@ -1,0 +1,27 @@
+# Seguridad y privacidad
+
+## Decisiones aplicadas
+
+- El servidor es la única autoridad para aprobar, rechazar o crear un gasto.
+- Una aprobación bloquea la solicitud en PostgreSQL y crea un gasto una sola vez.
+- Las contraseñas se protegen con Argon2; los refresh tokens se rotan y se guardan como hash.
+- Android cifra el refresh token con AES-GCM y una clave no exportable de Android Keystore.
+- La app no incluye secretos del servidor, credenciales de Firebase Admin ni contraseñas de base de datos.
+- Las notificaciones muestran texto genérico y privacidad de pantalla bloqueada; los detalles se consultan por HTTPS.
+- FCM solo despierta/sincroniza la app. PostgreSQL sigue siendo la fuente de verdad.
+- La base de datos y el worker no publican puertos en producción; solo Caddy expone 80/443.
+- Auditoría y outbox se escriben en la misma transacción que el cambio contable.
+
+## Antes de producción
+
+1. Configura un dominio y HTTPS válido.
+2. Genera secretos distintos para PostgreSQL y JWT; no reutilices claves del proyecto anterior.
+3. Descarga una cuenta de servicio Firebase con el mínimo acceso necesario y guárdala solo en `secrets/` del servidor.
+4. Activa copias de seguridad cifradas fuera de la VM y prueba una restauración.
+5. Restringe SSH en OCI a tu dirección IP; abre públicamente solo 80 y 443.
+6. Activa protección de rama, revisión de Dependabot y alertas de secretos en GitHub.
+7. Publica Android mediante Play App Signing y conserva la clave de carga fuera del repositorio.
+
+## Datos sensibles
+
+Los montos, descripciones, comercios y decisiones son información financiera privada. No deben incluirse en registros de aplicación, analítica, informes de errores ni cargas FCM. Los logs HTTP de Android están desactivados en producción y redactan `Authorization` en desarrollo.
