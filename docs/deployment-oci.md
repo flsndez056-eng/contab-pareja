@@ -5,10 +5,10 @@ Esta guía usa una sola VM de OCI con Docker Compose, PostgreSQL privado, API/wo
 ## 1. Preparar servicios externos
 
 1. Compra o utiliza un dominio y reserva un subdominio, por ejemplo `api.tudominio.com`.
-2. Crea un proyecto Firebase.
-3. Registra una app Android con el paquete `com.flsndez.contabpareja`.
+2. Usa el proyecto Firebase existente `contab-pareja`.
+3. Usa la app Android ya registrada con el paquete `com.flsndez.contabpareja`.
 4. Descarga `google-services.json` y colócalo en `android/app/google-services.json`.
-5. En Firebase/Google Cloud crea una cuenta de servicio para Firebase Admin y descarga el JSON. No lo subas a Git.
+5. Para el worker usa la cuenta dedicada `contab-pareja-fcm@contab-pareja.iam.gserviceaccount.com`, limitada al rol `roles/firebasecloudmessaging.admin`, y descarga su JSON una sola vez. No lo subas a Git.
 
 ## 2. Crear la VM
 
@@ -44,9 +44,8 @@ docker compose version
 
 ## 4. Publicar la imagen
 
-1. Crea el repositorio GitHub nuevo usando el contenido de esta carpeta como raíz.
-2. Empuja el código y espera que el workflow `CI` termine correctamente.
-3. Crea una versión:
+1. Empuja el código a `flsndez056-eng/contab-pareja` y espera que el workflow `CI` termine correctamente.
+2. Crea una versión:
 
 ```bash
 git tag v0.1.0
@@ -58,7 +57,7 @@ El workflow `Publicar API` crea imágenes `amd64` y `arm64` en GHCR. En GitHub c
 ## 5. Instalar la aplicación en la VM
 
 ```bash
-git clone https://github.com/TU-USUARIO/TU-REPOSITORIO.git contab-pareja
+git clone https://github.com/flsndez056-eng/contab-pareja.git contab-pareja
 cd contab-pareja
 mkdir -p secrets backups
 cp .env.production.example .env.production
