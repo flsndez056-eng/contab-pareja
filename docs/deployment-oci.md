@@ -2,6 +2,8 @@
 
 Esta guía usa una sola VM de OCI con Docker Compose, PostgreSQL privado, API/worker privados y Caddy como entrada HTTPS. Es una arquitectura adecuada para el primer lanzamiento; cuando el uso crezca, PostgreSQL puede migrarse a un servicio administrado sin cambiar el contrato móvil.
 
+Si la VM ya aloja servicios y tiene Nginx en `80/443`, usa en su lugar [`deployment-oci-shared.md`](deployment-oci-shared.md).
+
 ## 1. Preparar servicios externos
 
 1. Compra o utiliza un dominio y reserva un subdominio, por ejemplo `api.tudominio.com`.
