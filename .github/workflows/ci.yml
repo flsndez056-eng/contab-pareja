@@ -8,6 +8,15 @@ permissions:
   contents: read
 
 jobs:
+  deployment:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Validar Docker Compose para OCI
+        run: |
+          docker compose --env-file .env.production.example -f compose.oci.yaml config --quiet
+          docker compose --env-file .env.production.example -f compose.oci.yaml -f compose.oci-shared.yaml config --quiet
+
   backend:
     runs-on: ubuntu-latest
     services:
