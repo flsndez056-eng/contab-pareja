@@ -22,11 +22,29 @@ interface PublicApi {
 
     @POST("api/v1/auth/logout")
     suspend fun logout(@Body body: LogoutBody): Response<Unit>
+
+    @POST("api/v1/auth/password/forgot")
+    suspend fun forgotPassword(@Body body: ForgotPasswordBody): MessageDto
+
+    @POST("api/v1/auth/password/reset")
+    suspend fun resetPassword(@Body body: ResetPasswordBody)
+
+    @POST("api/v1/auth/email/verification/confirm")
+    suspend fun confirmEmail(@Body body: ConfirmEmailBody): UserDto
 }
 
 interface ContabApi {
     @GET("api/v1/auth/me")
     suspend fun me(): UserDto
+
+    @POST("api/v1/auth/password/change")
+    suspend fun changePassword(@Body body: ChangePasswordBody): AuthResponseDto
+
+    @POST("api/v1/auth/email/verification/request")
+    suspend fun requestEmailVerification(): MessageDto
+
+    @POST("api/v1/auth/sessions/revoke-all")
+    suspend fun revokeAllSessions(@Body body: ReauthenticateBody): AuthResponseDto
 
     @GET("api/v1/couples/current")
     suspend fun currentCouple(): CoupleStateDto

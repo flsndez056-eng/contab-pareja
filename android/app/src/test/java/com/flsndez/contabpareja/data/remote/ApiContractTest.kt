@@ -33,4 +33,13 @@ class ApiContractTest {
         assertTrue(json.contains("occurred_at"))
         assertTrue(json.contains("category_id"))
     }
+
+    @Test
+    fun passwordActionsUseBackendSnakeCaseFields() {
+        val resetJson = gson.toJson(ResetPasswordBody("token", "new-password"))
+        val changeJson = gson.toJson(ChangePasswordBody("current", "new-password"))
+        assertTrue(resetJson.contains("new_password"))
+        assertTrue(changeJson.contains("current_password"))
+        assertTrue(changeJson.contains("new_password"))
+    }
 }

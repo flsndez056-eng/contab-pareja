@@ -37,5 +37,6 @@ El cliente usa Kotlin, Jetpack Compose, Room, WorkManager, Retrofit y Firebase I
 
 - Arquitectura: `docs/architecture.md`.
 - Seguridad: `docs/security.md`.
+- Recuperación de acceso y sesiones: `docs/identity-access.md`.
 - Despliegue paso a paso en OCI: `docs/deployment-oci.md`.
 - Despliegue sin costo en una instancia OCI compartida: `docs/deployment-oci-shared.md`.

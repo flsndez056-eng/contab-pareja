@@ -9,8 +9,20 @@ data class RegisterBody(
 )
 
 data class LoginBody(val email: String, val password: String)
+data class ForgotPasswordBody(val email: String)
+data class ResetPasswordBody(
+    val token: String,
+    @SerializedName("new_password") val newPassword: String,
+)
+data class ConfirmEmailBody(val token: String)
+data class ChangePasswordBody(
+    @SerializedName("current_password") val currentPassword: String,
+    @SerializedName("new_password") val newPassword: String,
+)
+data class ReauthenticateBody(val password: String)
 data class RefreshBody(@SerializedName("refresh_token") val refreshToken: String)
 data class LogoutBody(@SerializedName("refresh_token") val refreshToken: String)
+data class MessageDto(val message: String)
 
 data class TokenPairDto(
     @SerializedName("access_token") val accessToken: String,

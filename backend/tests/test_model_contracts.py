@@ -1,4 +1,10 @@
-from app.models.entities import CoupleMember, Expense, ExpenseDecision, IdempotencyRecord
+from app.models.entities import (
+    CoupleMember,
+    EmailActionToken,
+    Expense,
+    ExpenseDecision,
+    IdempotencyRecord,
+)
 
 
 def constraint_names(model: type) -> set[str]:
@@ -18,3 +24,9 @@ def test_approval_cannot_create_duplicate_ledger_entry() -> None:
 
 def test_idempotency_key_is_unique_per_user_and_scope() -> None:
     assert "uq_idempotency_user_scope_key" in constraint_names(IdempotencyRecord)
+
+
+def test_email_action_token_is_unique_and_has_a_valid_purpose() -> None:
+    names = constraint_names(EmailActionToken)
+    assert "uq_email_action_tokens_token_hash" in names
+    assert "ck_email_action_tokens_valid_purpose" in names

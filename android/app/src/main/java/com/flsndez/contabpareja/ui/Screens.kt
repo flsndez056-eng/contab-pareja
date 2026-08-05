@@ -22,6 +22,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -65,6 +66,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.flsndez.contabpareja.data.local.CategoryEntity
 import com.flsndez.contabpareja.data.local.ExpenseRequestEntity
+import com.flsndez.contabpareja.data.remote.UserDto
 
 @Composable
 fun ContabApp(viewModel: MainViewModel) {
@@ -78,6 +80,13 @@ fun ContabApp(viewModel: MainViewModel) {
         }
     }
 
+    LaunchedEffect(state.notice) {
+        state.notice?.let {
+            snackbar.showSnackbar(it)
+            viewModel.clearNotice()
+        }
+    }
+
     Scaffold(snackbarHost = { SnackbarHost(snackbar) }) { padding ->
         Box(Modifier.fillMaxSize().padding(padding)) {
             when {
@@ -86,12 +95,26 @@ fun ContabApp(viewModel: MainViewModel) {
                     busy = state.busy,
                     onLogin = viewModel::login,
                     onRegister = viewModel::register,
+                    onForgotPassword = viewModel::showForgotPassword,
+                )
+                state.screen == AppScreen.FORGOT_PASSWORD -> ForgotPasswordScreen(
+                    busy = state.busy,
+                    onRequest = viewModel::requestPasswordReset,
+                    onHaveCode = { viewModel.showResetPassword() },
+                    onBack = viewModel::showAuth,
+                )
+                state.screen == AppScreen.RESET_PASSWORD -> ResetPasswordScreen(
+                    initialToken = state.resetToken,
+                    busy = state.busy,
+                    onSubmit = viewModel::resetPassword,
+                    onBack = viewModel::showAuth,
                 )
                 state.screen == AppScreen.COUPLE_SETUP -> CoupleSetupScreen(
                     busy = state.busy,
                     onCreate = viewModel::createCouple,
                     onJoin = viewModel::joinCouple,
                     onLogout = viewModel::logout,
+                    onSecurity = viewModel::showAccountSecurity,
                 )
                 state.screen == AppScreen.CREATE_EXPENSE -> CreateExpenseScreen(
                     categories = state.categories,
@@ -99,6 +122,15 @@ fun ContabApp(viewModel: MainViewModel) {
                     busy = state.busy,
                     onBack = viewModel::showHome,
                     onSubmit = viewModel::createExpense,
+                )
+                state.screen == AppScreen.ACCOUNT_SECURITY -> AccountSecurityScreen(
+                    user = state.user,
+                    busy = state.busy,
+                    onRequestVerification = viewModel::requestEmailVerification,
+                    onConfirmEmail = viewModel::confirmEmail,
+                    onChangePassword = viewModel::changePassword,
+                    onRevokeAllSessions = viewModel::revokeAllSessions,
+                    onBack = viewModel::closeAccountSecurity,
                 )
                 else -> HomeScreen(
                     state = state,
@@ -108,6 +140,7 @@ fun ContabApp(viewModel: MainViewModel) {
                     onDecide = viewModel::decide,
                     onCancel = viewModel::cancel,
                     onLogout = viewModel::logout,
+                    onSecurity = viewModel::showAccountSecurity,
                 )
             }
             if (state.busy) LinearProgressIndicator(Modifier.fillMaxWidth().align(Alignment.TopCenter))
@@ -131,6 +164,7 @@ private fun AuthScreen(
     busy: Boolean,
     onLogin: (String, String) -> Unit,
     onRegister: (String, String, String) -> Unit,
+    onForgotPassword: () -> Unit,
 ) {
     var registering by remember { mutableStateOf(false) }
     var name by remember { mutableStateOf("") }
@@ -194,7 +228,179 @@ private fun AuthScreen(
         ) {
             Text(if (registering) "Ya tengo una cuenta" else "Crear una cuenta nueva")
         }
+        if (!registering) {
+            TextButton(
+                onClick = onForgotPassword,
+                enabled = !busy,
+                modifier = Modifier.align(Alignment.CenterHorizontally),
+            ) { Text("Olvidé mi contraseña") }
+        }
     }
+}
+
+@Composable
+private fun ForgotPasswordScreen(
+    busy: Boolean,
+    onRequest: (String) -> Unit,
+    onHaveCode: () -> Unit,
+    onBack: () -> Unit,
+) {
+    var email by remember { mutableStateOf("") }
+    Column(
+        Modifier.fillMaxSize().padding(28.dp).verticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.Center,
+    ) {
+        Text("Recupera tu acceso", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+        Text("Te enviaremos un código temporal si el correo está registrado.")
+        Spacer(Modifier.height(24.dp))
+        OutlinedTextField(
+            value = email,
+            onValueChange = { email = it },
+            label = { Text("Correo electrónico") },
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Button(
+            onClick = { onRequest(email) },
+            enabled = email.contains('@') && !busy,
+            modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
+        ) { Text("Enviar instrucciones") }
+        TextButton(onClick = onHaveCode, enabled = !busy, modifier = Modifier.fillMaxWidth()) {
+            Text("Ya tengo un código")
+        }
+        TextButton(onClick = onBack, enabled = !busy, modifier = Modifier.fillMaxWidth()) {
+            Text("Volver al inicio de sesión")
+        }
+    }
+}
+
+@Composable
+private fun ResetPasswordScreen(
+    initialToken: String,
+    busy: Boolean,
+    onSubmit: (String, String) -> Unit,
+    onBack: () -> Unit,
+) {
+    var token by remember(initialToken) { mutableStateOf(initialToken) }
+    var password by remember { mutableStateOf("") }
+    var confirmation by remember { mutableStateOf("") }
+    val valid = token.length >= 32 && password.length >= 12 && password == confirmation
+
+    Column(
+        Modifier.fillMaxSize().padding(28.dp).verticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.Center,
+    ) {
+        Text("Nueva contraseña", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+        Text("El código solo puede utilizarse una vez.")
+        Spacer(Modifier.height(20.dp))
+        OutlinedTextField(
+            value = token,
+            onValueChange = { token = it.trim() },
+            label = { Text("Código de recuperación") },
+            minLines = 2,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Spacer(Modifier.height(12.dp))
+        PasswordField(password, { password = it }, "Contraseña nueva")
+        Spacer(Modifier.height(12.dp))
+        PasswordField(confirmation, { confirmation = it }, "Repetir contraseña")
+        Button(
+            onClick = { onSubmit(token, password) },
+            enabled = valid && !busy,
+            modifier = Modifier.fillMaxWidth().padding(top = 18.dp),
+        ) { Text("Cambiar contraseña") }
+        TextButton(onClick = onBack, enabled = !busy, modifier = Modifier.fillMaxWidth()) {
+            Text("Cancelar")
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun AccountSecurityScreen(
+    user: UserDto?,
+    busy: Boolean,
+    onRequestVerification: () -> Unit,
+    onConfirmEmail: (String) -> Unit,
+    onChangePassword: (String, String) -> Unit,
+    onRevokeAllSessions: (String) -> Unit,
+    onBack: () -> Unit,
+) {
+    var verificationCode by remember { mutableStateOf("") }
+    var currentPassword by remember { mutableStateOf("") }
+    var newPassword by remember { mutableStateOf("") }
+    var confirmation by remember { mutableStateOf("") }
+    var revokePassword by remember { mutableStateOf("") }
+
+    Scaffold(topBar = { TopAppBar(title = { Text("Seguridad de la cuenta") }) }) { padding ->
+        Column(
+            Modifier.fillMaxSize().padding(padding).padding(20.dp).verticalScroll(rememberScrollState()),
+        ) {
+            Text(user?.email.orEmpty(), style = MaterialTheme.typography.titleMedium)
+            Text(if (user?.emailVerified == true) "Correo verificado" else "Correo pendiente de verificar")
+            if (user?.emailVerified != true) {
+                FilledTonalButton(
+                    onClick = onRequestVerification,
+                    enabled = !busy,
+                    modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+                ) { Text("Enviar código de verificación") }
+                OutlinedTextField(
+                    value = verificationCode,
+                    onValueChange = { verificationCode = it.trim() },
+                    label = { Text("Código de verificación") },
+                    minLines = 2,
+                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                )
+                Button(
+                    onClick = { onConfirmEmail(verificationCode) },
+                    enabled = verificationCode.length >= 32 && !busy,
+                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                ) { Text("Confirmar correo") }
+            }
+
+            HorizontalDivider(Modifier.padding(vertical = 24.dp))
+            Text("Cambiar contraseña", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            PasswordField(currentPassword, { currentPassword = it }, "Contraseña actual")
+            Spacer(Modifier.height(10.dp))
+            PasswordField(newPassword, { newPassword = it }, "Contraseña nueva")
+            Spacer(Modifier.height(10.dp))
+            PasswordField(confirmation, { confirmation = it }, "Repetir contraseña")
+            Button(
+                onClick = { onChangePassword(currentPassword, newPassword) },
+                enabled = currentPassword.isNotBlank() && newPassword.length >= 12 &&
+                    newPassword == confirmation && !busy,
+                modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+            ) { Text("Actualizar contraseña") }
+
+            HorizontalDivider(Modifier.padding(vertical = 24.dp))
+            Text("Cerrar otras sesiones", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            Text("Los demás teléfonos deberán iniciar sesión otra vez.")
+            PasswordField(revokePassword, { revokePassword = it }, "Confirma tu contraseña")
+            OutlinedButton(
+                onClick = { onRevokeAllSessions(revokePassword) },
+                enabled = revokePassword.isNotBlank() && !busy,
+                modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+            ) { Text("Cerrar las demás sesiones") }
+            TextButton(onClick = onBack, enabled = !busy, modifier = Modifier.fillMaxWidth()) {
+                Text("Volver")
+            }
+        }
+    }
+}
+
+@Composable
+private fun PasswordField(value: String, onValueChange: (String) -> Unit, label: String) {
+    OutlinedTextField(
+        value = value,
+        onValueChange = onValueChange,
+        label = { Text(label) },
+        supportingText = { Text("Mínimo 12 caracteres") },
+        visualTransformation = PasswordVisualTransformation(),
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+        singleLine = true,
+        modifier = Modifier.fillMaxWidth(),
+    )
 }
 
 @Composable
@@ -203,6 +409,7 @@ private fun CoupleSetupScreen(
     onCreate: (String) -> Unit,
     onJoin: (String) -> Unit,
     onLogout: () -> Unit,
+    onSecurity: () -> Unit,
 ) {
     var coupleName by remember { mutableStateOf("Nuestra pareja") }
     var code by remember { mutableStateOf("") }
@@ -244,6 +451,9 @@ private fun CoupleSetupScreen(
         TextButton(onClick = onLogout, modifier = Modifier.align(Alignment.CenterHorizontally)) {
             Text("Cerrar sesión")
         }
+        TextButton(onClick = onSecurity, modifier = Modifier.align(Alignment.CenterHorizontally)) {
+            Text("Seguridad de la cuenta")
+        }
     }
 }
 
@@ -257,6 +467,7 @@ private fun HomeScreen(
     onDecide: (String, Boolean, String?) -> Unit,
     onCancel: (String) -> Unit,
     onLogout: () -> Unit,
+    onSecurity: () -> Unit,
 ) {
     var rejectTarget by remember { mutableStateOf<ExpenseRequestEntity?>(null) }
     val userId = state.user?.id
@@ -268,6 +479,7 @@ private fun HomeScreen(
                 title = { Column { Text(state.coupleState?.couple?.name ?: "Contab Pareja"); Text("Hola, ${state.user?.displayName.orEmpty()}", style = MaterialTheme.typography.labelMedium) } },
                 actions = {
                     IconButton(onClick = onRefresh, enabled = !state.busy) { Icon(Icons.Default.Refresh, "Actualizar") }
+                    IconButton(onClick = onSecurity) { Icon(Icons.Default.Settings, "Seguridad") }
                     IconButton(onClick = onLogout) { Icon(Icons.AutoMirrored.Filled.Logout, "Cerrar sesión") }
                 },
             )

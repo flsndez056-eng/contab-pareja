@@ -5,7 +5,7 @@ from decimal import Decimal
 import pytest
 from pydantic import ValidationError
 
-from app.schemas.auth import RegisterRequest
+from app.schemas.auth import ForgotPasswordRequest, RegisterRequest, ResetPasswordRequest
 from app.schemas.devices import RegisterDeviceRequest
 from app.schemas.expenses import CreateExpenseRequest, DecisionRequest
 
@@ -18,6 +18,16 @@ def test_registration_normalizes_identity() -> None:
     )
     assert str(request.email) == "person@example.com"
     assert request.display_name == "Ana María"
+
+
+def test_password_recovery_normalizes_email() -> None:
+    request = ForgotPasswordRequest(email="  PERSON@Example.COM ")
+    assert str(request.email) == "person@example.com"
+
+
+def test_password_reset_requires_a_strong_password() -> None:
+    with pytest.raises(ValidationError):
+        ResetPasswordRequest(token="x" * 48, new_password="short")
 
 
 def test_personal_payment_requires_payer() -> None:
