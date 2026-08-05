@@ -125,6 +125,8 @@ async def create_expense_request(
                 ),
             ]
         )
+        await session.flush()
+        await session.refresh(request)
     return request
 
 
@@ -203,6 +205,8 @@ async def decide_expense_request(
                 ),
             ]
         )
+        await session.flush()
+        await session.refresh(request)
     return request
 
 
@@ -243,6 +247,8 @@ async def cancel_expense_request(
                 ),
             ]
         )
+        await session.flush()
+        await session.refresh(request)
     return request
 
 
