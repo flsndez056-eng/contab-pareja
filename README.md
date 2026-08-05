@@ -28,7 +28,7 @@ No guardes credenciales reales en Git ni en archivos de ejemplo.
 El cliente usa Kotlin, Jetpack Compose, Room, WorkManager, Retrofit y Firebase Installation IDs. En debug se conecta a `http://10.0.2.2:8000/` desde el emulador.
 
 1. Abre `android/` en Android Studio.
-2. Para notificaciones, registra el paquete `com.flsndez.contabpareja` en Firebase y coloca `google-services.json` en `android/app/`.
+2. Para notificaciones, usa la app Android ya registrada en el proyecto Firebase `contab-pareja` y coloca `google-services.json` en `android/app/`.
 3. Ejecuta `./gradlew testDebugUnitTest lintDebug assembleDebug`.
 4. Para release pasa `-PCONTAB_API_BASE_URL=https://api.tudominio.com/`.
 
