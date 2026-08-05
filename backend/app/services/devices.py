@@ -4,6 +4,7 @@ from datetime import UTC, datetime
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.db.session import transaction
 from app.models.entities import Device
 from app.schemas.devices import RegisterDeviceRequest
 
@@ -11,7 +12,7 @@ from app.schemas.devices import RegisterDeviceRequest
 async def register_device(
     session: AsyncSession, user_id: uuid.UUID, data: RegisterDeviceRequest
 ) -> Device:
-    async with session.begin():
+    async with transaction(session):
         device = await session.scalar(
             select(Device).where(Device.installation_id == data.installation_id).with_for_update()
         )
@@ -33,7 +34,7 @@ async def register_device(
 
 
 async def disable_device(session: AsyncSession, user_id: uuid.UUID, installation_id: str) -> None:
-    async with session.begin():
+    async with transaction(session):
         device = await session.scalar(
             select(Device).where(
                 Device.installation_id == installation_id,

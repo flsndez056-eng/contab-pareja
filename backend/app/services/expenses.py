@@ -7,6 +7,7 @@ from fastapi import HTTPException
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.db.session import transaction
 from app.models.entities import (
     AuditEvent,
     Category,
@@ -44,7 +45,7 @@ async def create_expense_request(
     idempotency_key: str,
 ) -> ExpenseRequest:
     body_hash = hashlib.sha256(data.model_dump_json().encode("utf-8")).hexdigest()
-    async with session.begin():
+    async with transaction(session):
         previous = await session.scalar(
             select(IdempotencyRecord).where(
                 IdempotencyRecord.user_id == user_id,
@@ -133,7 +134,7 @@ async def decide_expense_request(
     request_id: uuid.UUID,
     data: DecisionRequest,
 ) -> ExpenseRequest:
-    async with session.begin():
+    async with transaction(session):
         request = await session.scalar(
             select(ExpenseRequest).where(ExpenseRequest.id == request_id).with_for_update()
         )
@@ -208,7 +209,7 @@ async def decide_expense_request(
 async def cancel_expense_request(
     session: AsyncSession, user_id: uuid.UUID, request_id: uuid.UUID
 ) -> ExpenseRequest:
-    async with session.begin():
+    async with transaction(session):
         request = await session.scalar(
             select(ExpenseRequest).where(ExpenseRequest.id == request_id).with_for_update()
         )
