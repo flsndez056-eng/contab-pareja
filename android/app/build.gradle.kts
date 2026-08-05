@@ -13,6 +13,11 @@ val productionApiBaseUrl = providers.gradleProperty("CONTAB_API_BASE_URL")
     .get()
     .let { if (it.endsWith('/')) it else "$it/" }
 
+val debugApiBaseUrl = providers.gradleProperty("CONTAB_DEBUG_API_BASE_URL")
+    .orElse("http://10.0.2.2:8000/")
+    .get()
+    .let { if (it.endsWith('/')) it else "$it/" }
+
 android {
     namespace = "com.flsndez.contabpareja"
     compileSdk = 37
@@ -31,7 +36,7 @@ android {
 
     buildTypes {
         debug {
-            buildConfigField("String", "API_BASE_URL", "\"http://10.0.2.2:8000/\"")
+            buildConfigField("String", "API_BASE_URL", "\"$debugApiBaseUrl\"")
         }
         release {
             isMinifyEnabled = true

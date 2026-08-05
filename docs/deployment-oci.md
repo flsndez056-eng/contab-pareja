@@ -107,10 +107,16 @@ Desde tu computadora, con `google-services.json` ya colocado:
 
 ```bash
 cd android
-./gradlew bundleRelease -PCONTAB_API_BASE_URL=https://api.tudominio.com/
+./gradlew bundleRelease -PCONTAB_API_BASE_URL=https://contab.siptrapollo.online/
 ```
 
 Para publicar en Google Play configura una clave de carga y Play App Signing. No uses una APK debug para usuarios reales.
+
+Para pruebas controladas en teléfonos físicos, puedes generar temporalmente un APK firmado con la clave de depuración:
+
+```bash
+./gradlew assembleDebug -PCONTAB_DEBUG_API_BASE_URL=https://contab.siptrapollo.online/
+```
 
 ## 7. Copias de seguridad
 
