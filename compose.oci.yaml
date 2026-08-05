@@ -46,6 +46,8 @@ services:
       <<: *app-environment
       GOOGLE_APPLICATION_CREDENTIALS: /run/secrets/firebase_credentials
     command: ["python", "-m", "app.workers.outbox"]
+    healthcheck:
+      disable: true
     secrets: [firebase_credentials]
     depends_on:
       api:
