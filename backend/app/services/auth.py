@@ -15,6 +15,7 @@ from app.core.security import (
     new_refresh_token,
     verify_password,
 )
+from app.db.session import transaction
 from app.models.entities import RefreshSession, User
 from app.schemas.auth import AuthResponse, LoginRequest, RegisterRequest, TokenPair
 
@@ -39,7 +40,7 @@ async def _issue_tokens(session: AsyncSession, user_id: uuid.UUID) -> TokenPair:
 
 async def register(session: AsyncSession, data: RegisterRequest) -> AuthResponse:
     try:
-        async with session.begin():
+        async with transaction(session):
             existing = await session.scalar(select(User.id).where(User.email == str(data.email)))
             if existing:
                 raise HTTPException(status_code=409, detail="El correo ya está registrado.")
@@ -57,7 +58,7 @@ async def register(session: AsyncSession, data: RegisterRequest) -> AuthResponse
 
 
 async def login(session: AsyncSession, data: LoginRequest) -> AuthResponse:
-    async with session.begin():
+    async with transaction(session):
         user = await session.scalar(select(User).where(User.email == str(data.email)))
         encoded = user.password_hash if user else DUMMY_PASSWORD_HASH
         password_ok = verify_password(data.password, encoded)
@@ -73,7 +74,7 @@ async def login(session: AsyncSession, data: LoginRequest) -> AuthResponse:
 
 async def rotate_refresh_token(session: AsyncSession, raw_token: str) -> TokenPair:
     token_hash = hash_refresh_token(raw_token)
-    async with session.begin():
+    async with transaction(session):
         current = await session.scalar(
             select(RefreshSession).where(RefreshSession.token_hash == token_hash).with_for_update()
         )
@@ -93,7 +94,7 @@ async def rotate_refresh_token(session: AsyncSession, raw_token: str) -> TokenPa
 
 
 async def logout(session: AsyncSession, raw_token: str) -> None:
-    async with session.begin():
+    async with transaction(session):
         refresh = await session.scalar(
             select(RefreshSession)
             .where(RefreshSession.token_hash == hash_refresh_token(raw_token))

@@ -7,6 +7,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import hash_invitation_code, new_invitation_code
+from app.db.session import transaction
 from app.models.entities import Couple, CoupleMember, Invitation, User
 from app.schemas.couples import (
     CoupleStateResponse,
@@ -20,7 +21,7 @@ async def create_couple(
     session: AsyncSession, user_id: uuid.UUID, data: CreateCoupleRequest
 ) -> Couple:
     try:
-        async with session.begin():
+        async with transaction(session):
             membership = await session.scalar(
                 select(CoupleMember.id).where(CoupleMember.user_id == user_id)
             )
@@ -40,7 +41,7 @@ async def create_couple(
 
 
 async def create_invitation(session: AsyncSession, user_id: uuid.UUID) -> InvitationResponse:
-    async with session.begin():
+    async with transaction(session):
         member = await session.scalar(select(CoupleMember).where(CoupleMember.user_id == user_id))
         if member is None:
             raise HTTPException(status_code=409, detail="Primero debes crear una pareja.")
@@ -82,7 +83,7 @@ async def create_invitation(session: AsyncSession, user_id: uuid.UUID) -> Invita
 
 async def join_couple(session: AsyncSession, user_id: uuid.UUID, code: str) -> Couple:
     try:
-        async with session.begin():
+        async with transaction(session):
             own_membership = await session.scalar(
                 select(CoupleMember.id).where(CoupleMember.user_id == user_id)
             )
