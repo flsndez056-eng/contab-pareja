@@ -64,7 +64,18 @@ class AuthRepository(
 
     fun clearSession() {
         session.accessToken = null
-        secureStore.clear()
+        secureStore.clearRefreshToken()
+    }
+
+    fun rememberPendingInvite(token: String) = secureStore.savePendingInviteToken(token.trim())
+
+    fun pendingInviteToken(): String? = secureStore.pendingInviteToken()
+
+    fun clearPendingInvite() = secureStore.clearPendingInviteToken()
+
+    fun clearAllSessionData() {
+        session.accessToken = null
+        secureStore.clearAll()
     }
 
     fun accept(response: AuthResponseDto) = persist(response)

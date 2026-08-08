@@ -32,6 +32,8 @@ def notification_copy(event_type: str) -> tuple[str, str]:
         "expense.approved": ("Gasto aprobado", "Tu solicitud fue aprobada."),
         "expense.rejected": ("Gasto rechazado", "Tu solicitud fue rechazada."),
         "expense.cancelled": ("Solicitud cancelada", "La solicitud pendiente fue cancelada."),
+        "couple.joined": ("Pareja conectada", "Tu pareja aceptó la invitación."),
+        "couple.ended": ("Conexión finalizada", "La relación quedó archivada para ambos."),
     }
     return messages.get(event_type, ("Contab Pareja", "Hay una actualización pendiente."))
 

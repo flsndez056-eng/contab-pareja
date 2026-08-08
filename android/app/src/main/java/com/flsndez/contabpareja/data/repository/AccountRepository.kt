@@ -3,6 +3,7 @@ package com.flsndez.contabpareja.data.repository
 import com.flsndez.contabpareja.data.remote.ContabApi
 import com.flsndez.contabpareja.data.remote.AuthResponseDto
 import com.flsndez.contabpareja.data.remote.ChangePasswordBody
+import com.flsndez.contabpareja.data.remote.DeleteAccountBody
 import com.flsndez.contabpareja.data.remote.ReauthenticateBody
 import com.flsndez.contabpareja.data.remote.UserDto
 
@@ -16,4 +17,8 @@ class AccountRepository(private val api: ContabApi) {
 
     suspend fun revokeAllSessions(password: String): AuthResponseDto =
         api.revokeAllSessions(ReauthenticateBody(password))
+
+    suspend fun deleteAccount(password: String) {
+        api.deleteAccount(DeleteAccountBody(password))
+    }
 }

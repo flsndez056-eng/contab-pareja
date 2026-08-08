@@ -1,5 +1,11 @@
 package com.flsndez.contabpareja.ui
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
+import android.content.Intent
+import android.graphics.Bitmap
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -10,6 +16,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -58,6 +65,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -66,7 +75,12 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.flsndez.contabpareja.data.local.CategoryEntity
 import com.flsndez.contabpareja.data.local.ExpenseRequestEntity
+import com.flsndez.contabpareja.data.remote.CoupleHistoryItemDto
+import com.flsndez.contabpareja.data.remote.InvitationDto
+import com.flsndez.contabpareja.data.remote.InvitationPreviewDto
 import com.flsndez.contabpareja.data.remote.UserDto
+import com.google.zxing.BarcodeFormat
+import com.google.zxing.qrcode.QRCodeWriter
 
 @Composable
 fun ContabApp(viewModel: MainViewModel) {
@@ -115,11 +129,27 @@ fun ContabApp(viewModel: MainViewModel) {
                     onBack = viewModel::showAuth,
                 )
                 state.screen == AppScreen.COUPLE_SETUP -> CoupleSetupScreen(
+                    user = state.user,
                     busy = state.busy,
                     onCreate = viewModel::createCouple,
                     onJoin = viewModel::joinCouple,
+                    onRequestVerification = viewModel::requestEmailVerification,
+                    onHistory = viewModel::showHistory,
                     onLogout = viewModel::logout,
                     onSecurity = viewModel::showAccountSecurity,
+                )
+                state.screen == AppScreen.INVITE_PREVIEW -> InvitationPreviewScreen(
+                    preview = state.invitePreview,
+                    emailVerified = state.user?.emailVerified == true,
+                    busy = state.busy,
+                    onAccept = viewModel::acceptInvitation,
+                    onDecline = viewModel::declineInvitation,
+                    onRequestVerification = viewModel::requestEmailVerification,
+                    onSecurity = viewModel::showAccountSecurity,
+                )
+                state.screen == AppScreen.RELATIONSHIP_HISTORY -> RelationshipHistoryScreen(
+                    history = state.coupleHistory,
+                    onBack = viewModel::closeHistory,
                 )
                 state.screen == AppScreen.CREATE_EXPENSE -> CreateExpenseScreen(
                     categories = state.categories,
@@ -135,6 +165,10 @@ fun ContabApp(viewModel: MainViewModel) {
                     onConfirmEmail = viewModel::confirmEmail,
                     onChangePassword = viewModel::changePassword,
                     onRevokeAllSessions = viewModel::revokeAllSessions,
+                    hasActiveCouple = state.coupleState?.couple != null,
+                    onEndCouple = viewModel::endCouple,
+                    onDeleteAccount = viewModel::deleteAccount,
+                    onHistory = viewModel::showHistory,
                     onBack = viewModel::closeAccountSecurity,
                 )
                 else -> HomeScreen(
@@ -361,6 +395,10 @@ private fun AccountSecurityScreen(
     onConfirmEmail: (String) -> Unit,
     onChangePassword: (String, String) -> Unit,
     onRevokeAllSessions: (String) -> Unit,
+    hasActiveCouple: Boolean,
+    onEndCouple: (String) -> Unit,
+    onDeleteAccount: (String) -> Unit,
+    onHistory: () -> Unit,
     onBack: () -> Unit,
 ) {
     var verificationCode by remember { mutableStateOf("") }
@@ -368,6 +406,8 @@ private fun AccountSecurityScreen(
     var newPassword by remember { mutableStateOf("") }
     var confirmation by remember { mutableStateOf("") }
     var revokePassword by remember { mutableStateOf("") }
+    var showEndDialog by remember { mutableStateOf(false) }
+    var showDeleteDialog by remember { mutableStateOf(false) }
 
     Scaffold(topBar = { TopAppBar(title = { Text("Seguridad de la cuenta") }) }) { padding ->
         Column(
@@ -418,11 +458,128 @@ private fun AccountSecurityScreen(
                 enabled = revokePassword.isNotBlank() && !busy,
                 modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
             ) { Text("Cerrar las demás sesiones") }
+
+            HorizontalDivider(Modifier.padding(vertical = 24.dp))
+            Text("Relaciones y privacidad", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            Text("El historial aprobado se conserva para ambos, incluso si cambias de pareja.")
+            OutlinedButton(
+                onClick = onHistory,
+                enabled = !busy,
+                modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+            ) { Text("Ver historial de relaciones") }
+            if (hasActiveCouple) {
+                OutlinedButton(
+                    onClick = { showEndDialog = true },
+                    enabled = !busy,
+                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                ) { Text("Cerrar relación actual") }
+            }
+            Text(
+                "Al eliminar tu cuenta, tu correo queda libre para volver a registrarte. " +
+                    "Tu nombre y correo se ocultan del historial compartido.",
+                modifier = Modifier.padding(top = 20.dp),
+                color = MaterialTheme.colorScheme.error,
+            )
+            Button(
+                onClick = { showDeleteDialog = true },
+                enabled = !busy,
+                modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
+            ) { Text("Eliminar mi cuenta") }
             TextButton(onClick = onBack, enabled = !busy, modifier = Modifier.fillMaxWidth()) {
                 Text("Volver")
             }
         }
     }
+
+    if (showEndDialog) {
+        PasswordConfirmationDialog(
+            title = "Cerrar relación",
+            explanation = "Se cancelarán las solicitudes pendientes. Ambos podrán conectar otra pareja y el historial aprobado seguirá disponible.",
+            confirmLabel = "Cerrar relación",
+            busy = busy,
+            onDismiss = { showEndDialog = false },
+            onConfirm = {
+                showEndDialog = false
+                onEndCouple(it)
+            },
+        )
+    }
+    if (showDeleteDialog) {
+        DeleteAccountDialog(
+            busy = busy,
+            onDismiss = { showDeleteDialog = false },
+            onConfirm = {
+                showDeleteDialog = false
+                onDeleteAccount(it)
+            },
+        )
+    }
+}
+
+@Composable
+private fun PasswordConfirmationDialog(
+    title: String,
+    explanation: String,
+    confirmLabel: String,
+    busy: Boolean,
+    onDismiss: () -> Unit,
+    onConfirm: (String) -> Unit,
+) {
+    var password by remember { mutableStateOf("") }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title) },
+        text = {
+            Column {
+                Text(explanation)
+                Spacer(Modifier.height(12.dp))
+                PasswordField(password, { password = it }, "Confirma tu contraseña")
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = { onConfirm(password) },
+                enabled = password.isNotBlank() && !busy,
+            ) { Text(confirmLabel) }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancelar") } },
+    )
+}
+
+@Composable
+private fun DeleteAccountDialog(
+    busy: Boolean,
+    onDismiss: () -> Unit,
+    onConfirm: (String) -> Unit,
+) {
+    var password by remember { mutableStateOf("") }
+    var confirmation by remember { mutableStateOf("") }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Eliminar cuenta definitivamente") },
+        text = {
+            Column {
+                Text("Esta acción cierra tu relación actual, anonimiza tu cuenta y cierra todas tus sesiones.")
+                Spacer(Modifier.height(12.dp))
+                PasswordField(password, { password = it }, "Contraseña")
+                Spacer(Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = confirmation,
+                    onValueChange = { confirmation = it.uppercase() },
+                    label = { Text("Escribe ELIMINAR") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = { onConfirm(password) },
+                enabled = password.isNotBlank() && confirmation == "ELIMINAR" && !busy,
+            ) { Text("Eliminar definitivamente") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Conservar cuenta") } },
+    )
 }
 
 @Composable
@@ -441,9 +598,12 @@ private fun PasswordField(value: String, onValueChange: (String) -> Unit, label:
 
 @Composable
 private fun CoupleSetupScreen(
+    user: UserDto?,
     busy: Boolean,
     onCreate: (String) -> Unit,
     onJoin: (String) -> Unit,
+    onRequestVerification: () -> Unit,
+    onHistory: () -> Unit,
     onLogout: () -> Unit,
     onSecurity: () -> Unit,
 ) {
@@ -454,7 +614,23 @@ private fun CoupleSetupScreen(
         verticalArrangement = Arrangement.Center,
     ) {
         Text("Conecta a tu pareja", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-        Text("Crea un espacio nuevo o introduce el código que recibiste.")
+        Text("Crea un espacio y comparte el enlace o escanea el QR desde el otro teléfono.")
+        if (user?.emailVerified != true) {
+            Card(
+                modifier = Modifier.fillMaxWidth().padding(top = 20.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer),
+            ) {
+                Column(Modifier.padding(16.dp)) {
+                    Text("Verifica tu correo primero", fontWeight = FontWeight.Bold)
+                    Text("Es una protección para evitar que otra persona conecte cuentas sin permiso.")
+                    FilledTonalButton(
+                        onClick = onRequestVerification,
+                        enabled = !busy,
+                        modifier = Modifier.padding(top = 8.dp),
+                    ) { Text("Enviar verificación") }
+                }
+            }
+        }
         Spacer(Modifier.height(28.dp))
         OutlinedTextField(
             value = coupleName,
@@ -464,9 +640,9 @@ private fun CoupleSetupScreen(
         )
         Button(
             onClick = { onCreate(coupleName) },
-            enabled = coupleName.trim().length >= 2 && !busy,
+            enabled = coupleName.trim().length >= 2 && user?.emailVerified == true && !busy,
             modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
-        ) { Text("Crear espacio") }
+        ) { Text("Crear y preparar invitación") }
         Row(Modifier.fillMaxWidth().padding(vertical = 24.dp), verticalAlignment = Alignment.CenterVertically) {
             HorizontalDivider(Modifier.weight(1f))
             Text("  o  ")
@@ -481,14 +657,110 @@ private fun CoupleSetupScreen(
         )
         OutlinedButton(
             onClick = { onJoin(code) },
-            enabled = code.length == 9 && !busy,
+            enabled = code.length == 9 && user?.emailVerified == true && !busy,
             modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
         ) { Text("Unirme") }
+        TextButton(onClick = onHistory, modifier = Modifier.align(Alignment.CenterHorizontally)) {
+            Text("Ver relaciones anteriores")
+        }
         TextButton(onClick = onLogout, modifier = Modifier.align(Alignment.CenterHorizontally)) {
             Text("Cerrar sesión")
         }
         TextButton(onClick = onSecurity, modifier = Modifier.align(Alignment.CenterHorizontally)) {
             Text("Seguridad de la cuenta")
+        }
+    }
+}
+
+@Composable
+private fun InvitationPreviewScreen(
+    preview: InvitationPreviewDto?,
+    emailVerified: Boolean,
+    busy: Boolean,
+    onAccept: () -> Unit,
+    onDecline: () -> Unit,
+    onRequestVerification: () -> Unit,
+    onSecurity: () -> Unit,
+) {
+    Column(
+        Modifier.fillMaxSize().padding(28.dp).verticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.Center,
+    ) {
+        Text("Invitación de pareja", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+        Spacer(Modifier.height(20.dp))
+        Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)) {
+            Column(Modifier.fillMaxWidth().padding(20.dp)) {
+                Text(preview?.inviterName.orEmpty(), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                Text("te invita a compartir")
+                Text(preview?.coupleName.orEmpty(), style = MaterialTheme.typography.headlineSmall)
+                Text("Vence: ${preview?.expiresAt.orEmpty()}", modifier = Modifier.padding(top = 10.dp))
+            }
+        }
+        if (!emailVerified) {
+            Text(
+                "Debes verificar tu correo antes de aceptar. La invitación quedará guardada.",
+                modifier = Modifier.padding(top = 18.dp),
+            )
+            FilledTonalButton(
+                onClick = onRequestVerification,
+                enabled = !busy,
+                modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
+            ) { Text("Enviar verificación") }
+            TextButton(onClick = onSecurity, modifier = Modifier.fillMaxWidth()) {
+                Text("Introducir código de verificación")
+            }
+        }
+        Button(
+            onClick = onAccept,
+            enabled = preview != null && emailVerified && !busy,
+            modifier = Modifier.fillMaxWidth().padding(top = 22.dp),
+        ) { Text("Aceptar y conectar cuentas") }
+        OutlinedButton(
+            onClick = onDecline,
+            enabled = !busy,
+            modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+        ) { Text("Rechazar invitación") }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun RelationshipHistoryScreen(
+    history: List<CoupleHistoryItemDto>,
+    onBack: () -> Unit,
+) {
+    Scaffold(topBar = { TopAppBar(title = { Text("Historial de relaciones") }) }) { padding ->
+        LazyColumn(
+            modifier = Modifier.fillMaxSize().padding(padding),
+            contentPadding = PaddingValues(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            if (history.isEmpty()) {
+                item {
+                    Text(
+                        "Aún no tienes relaciones anteriores.",
+                        modifier = Modifier.fillMaxWidth().padding(24.dp),
+                        textAlign = TextAlign.Center,
+                    )
+                }
+            }
+            items(history, key = { it.couple.id }) { item ->
+                Card {
+                    Column(Modifier.fillMaxWidth().padding(16.dp)) {
+                        Text(item.couple.name, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                        Text(item.members.joinToString(" y ") { it.displayName })
+                        Text("Finalizada: ${item.couple.endedAt.orEmpty()}")
+                        Text(
+                            "${item.expenseCount} gastos aprobados · ${money(item.total, item.couple.defaultCurrency)}",
+                            modifier = Modifier.padding(top = 8.dp),
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                    }
+                }
+            }
+            item {
+                TextButton(onClick = onBack, modifier = Modifier.fillMaxWidth()) { Text("Volver") }
+            }
         }
     }
 }
@@ -538,7 +810,7 @@ private fun HomeScreen(
             }
             if ((state.coupleState?.members?.size ?: 0) < 2) {
                 item {
-                    InvitationCard(state.invitationCode, onInvite)
+                    InvitationCard(state.invitation, onInvite)
                 }
             }
             item {
@@ -592,20 +864,76 @@ private fun SummaryCard(state: MainUiState, pendingForMe: Int) {
 }
 
 @Composable
-private fun InvitationCard(code: String?, onInvite: () -> Unit) {
+private fun InvitationCard(invitation: InvitationDto?, onInvite: () -> Unit) {
+    val context = LocalContext.current
     Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)) {
-        Column(Modifier.fillMaxWidth().padding(18.dp)) {
+        Column(
+            Modifier.fillMaxWidth().padding(18.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
             Text("Falta conectar a tu pareja", fontWeight = FontWeight.Bold)
-            Text("Genera un código temporal y compártelo de forma privada.")
-            if (code == null) {
+            Text("Comparte el enlace, muestra el QR o usa el código temporal.")
+            if (invitation == null) {
                 FilledTonalButton(onClick = onInvite, modifier = Modifier.padding(top = 10.dp)) {
-                    Text("Generar código")
+                    Text("Preparar invitación")
                 }
             } else {
-                Text(code, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 10.dp))
+                val bitmap = remember(invitation.inviteUrl) { createQrBitmap(invitation.inviteUrl) }
+                Image(
+                    bitmap = bitmap.asImageBitmap(),
+                    contentDescription = "Código QR de invitación",
+                    modifier = Modifier.size(210.dp).padding(top = 12.dp),
+                )
+                Text(
+                    invitation.code,
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(top = 10.dp),
+                )
+                Text("Vence: ${invitation.expiresAt}", style = MaterialTheme.typography.bodySmall)
+                Button(
+                    onClick = { shareInvitation(context, invitation.inviteUrl) },
+                    modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+                ) { Text("Compartir invitación") }
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(
+                        onClick = { copyText(context, "Enlace de Contab Pareja", invitation.inviteUrl) },
+                        modifier = Modifier.weight(1f),
+                    ) { Text("Copiar enlace") }
+                    OutlinedButton(
+                        onClick = { copyText(context, "Código de Contab Pareja", invitation.code) },
+                        modifier = Modifier.weight(1f),
+                    ) { Text("Copiar código") }
+                }
             }
         }
     }
+}
+
+private fun createQrBitmap(value: String): Bitmap {
+    val size = 512
+    val matrix = QRCodeWriter().encode(value, BarcodeFormat.QR_CODE, size, size)
+    return Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888).apply {
+        for (x in 0 until size) {
+            for (y in 0 until size) {
+                setPixel(x, y, if (matrix[x, y]) android.graphics.Color.BLACK else android.graphics.Color.WHITE)
+            }
+        }
+    }
+}
+
+private fun shareInvitation(context: Context, url: String) {
+    val intent = Intent(Intent.ACTION_SEND).apply {
+        type = "text/plain"
+        putExtra(Intent.EXTRA_SUBJECT, "Invitación a Contab Pareja")
+        putExtra(Intent.EXTRA_TEXT, "Conecta tu cuenta conmigo en Contab Pareja: $url")
+    }
+    context.startActivity(Intent.createChooser(intent, "Compartir invitación"))
+}
+
+private fun copyText(context: Context, label: String, value: String) {
+    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+    clipboard.setPrimaryClip(ClipData.newPlainText(label, value))
 }
 
 @Composable

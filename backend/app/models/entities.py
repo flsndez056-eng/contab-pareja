@@ -19,6 +19,7 @@ from sqlalchemy import (
     UniqueConstraint,
     Uuid,
     func,
+    text,
 )
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -58,6 +59,7 @@ class User(Base):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
     email_verified: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     auth_version: Mapped[int] = mapped_column(Integer, default=1, server_default="1")
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
@@ -93,6 +95,10 @@ class Couple(Base):
     name: Mapped[str] = mapped_column(String(100), default="Nuestra pareja")
     default_currency: Mapped[str] = mapped_column(String(3), default="DOP")
     timezone: Mapped[str] = mapped_column(String(64), default="America/Santo_Domingo")
+    ended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
+    ended_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL")
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     __table_args__ = (CheckConstraint("length(default_currency) = 3", name="currency_length"),)
@@ -106,17 +112,25 @@ class CoupleMember(Base):
         ForeignKey("couples.id", ondelete="CASCADE"), index=True
     )
     user_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("users.id", ondelete="RESTRICT"), unique=True, index=True
+        ForeignKey("users.id", ondelete="RESTRICT"), index=True
     )
     slot: Mapped[int] = mapped_column(SmallInteger)
     role: Mapped[str] = mapped_column(String(16), default="member")
     joined_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    left_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     __table_args__ = (
         CheckConstraint("slot IN (1, 2)", name="valid_slot"),
         CheckConstraint("role IN ('owner', 'member')", name="valid_role"),
         UniqueConstraint("couple_id", "slot", name="uq_couple_members_couple_slot"),
         UniqueConstraint("couple_id", "user_id", name="uq_couple_members_couple_user"),
+        Index(
+            "uq_couple_members_active_user",
+            "user_id",
+            unique=True,
+            postgresql_where=text("left_at IS NULL"),
+        ),
+        Index("ix_couple_members_user_history", "user_id", "left_at"),
     )
 
 
@@ -127,6 +141,7 @@ class Invitation(Base):
     couple_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("couples.id", ondelete="CASCADE"))
     created_by: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"))
     code_hash: Mapped[str] = mapped_column(String(64), unique=True)
+    token_hash: Mapped[str | None] = mapped_column(String(64), unique=True)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     used_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
     used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

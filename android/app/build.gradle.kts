@@ -26,8 +26,8 @@ android {
         applicationId = "com.flsndez.contabpareja"
         minSdk = 23
         targetSdk = 37
-        versionCode = 4
-        versionName = "0.2.3"
+        versionCode = 5
+        versionName = "0.3.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true
@@ -87,6 +87,7 @@ dependencies {
     implementation(libs.okhttp)
     implementation(libs.okhttp.logging)
     implementation(libs.kotlinx.coroutines.android)
+    implementation(libs.zxing.core)
     coreLibraryDesugaring(libs.desugar.jdk.libs)
 
     testImplementation(libs.junit)

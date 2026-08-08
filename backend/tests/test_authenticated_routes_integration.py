@@ -4,7 +4,7 @@ from datetime import UTC, datetime
 
 import httpx
 import pytest
-from sqlalchemy import delete, select
+from sqlalchemy import delete, or_, select, update
 
 from app.db.session import SessionFactory
 from app.main import app
@@ -31,6 +31,7 @@ async def test_authenticated_write_reuses_the_authentication_transaction() -> No
     owner_email = f"route-owner-{test_id}@example.com"
     partner_email = f"route-partner-{test_id}@example.com"
     transport = httpx.ASGITransport(app=app)
+    created_user_ids: list[uuid.UUID] = []
 
     try:
         async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
@@ -54,12 +55,22 @@ async def test_authenticated_write_reuses_the_authentication_transaction() -> No
             assert partner_registration.status_code == 201
             owner_data = owner_registration.json()
             partner_data = partner_registration.json()
+            created_user_ids.extend(
+                [uuid.UUID(owner_data["user"]["id"]), uuid.UUID(partner_data["user"]["id"])]
+            )
             owner_headers = {
                 "Authorization": f"Bearer {owner_data['tokens']['access_token']}"
             }
             partner_headers = {
                 "Authorization": f"Bearer {partner_data['tokens']['access_token']}"
             }
+
+            async with SessionFactory() as session, session.begin():
+                await session.execute(
+                    update(User)
+                    .where(User.email.in_([owner_email, partner_email]))
+                    .values(email_verified=True)
+                )
 
             couple_response = await client.post(
                 "/api/v1/couples",
@@ -77,10 +88,16 @@ async def test_authenticated_write_reuses_the_authentication_transaction() -> No
                 "/api/v1/couples/invitations", headers=owner_headers
             )
             assert invitation.status_code == 201
+            token = invitation.json()["invite_url"].split("token=", maxsplit=1)[1]
+            preview = await client.get(
+                "/api/v1/couples/invitations/preview", params={"token": token}
+            )
+            assert preview.status_code == 200
+            assert preview.json()["inviter_name"] == "Integration Owner"
             joined = await client.post(
                 "/api/v1/couples/join",
                 headers=partner_headers,
-                json={"code": invitation.json()["code"]},
+                json={"token": token},
             )
             assert joined.status_code == 200
 
@@ -108,15 +125,46 @@ async def test_authenticated_write_reuses_the_authentication_transaction() -> No
             assert decision.status_code == 200
             assert decision.json()["status"] == "approved"
             assert decision.json()["updated_at"]
+
+            ended = await client.post(
+                "/api/v1/couples/current/end",
+                headers=owner_headers,
+                json={"password": "integration-password-123"},
+            )
+            assert ended.status_code == 204
+            partner_current = await client.get(
+                "/api/v1/couples/current", headers=partner_headers
+            )
+            assert partner_current.status_code == 200
+            assert partner_current.json()["couple"] is None
+            history = await client.get("/api/v1/couples/history", headers=owner_headers)
+            assert history.status_code == 200
+            assert history.json()[0]["expense_count"] == 1
+            assert history.json()[0]["total"] == "125.50"
+
+            deleted = await client.request(
+                "DELETE",
+                "/api/v1/account",
+                headers=partner_headers,
+                json={
+                    "password": "integration-password-456",
+                    "confirmation": "ELIMINAR",
+                },
+            )
+            assert deleted.status_code == 204
+            registered_again = await client.post(
+                "/api/v1/auth/register",
+                json={
+                    "email": partner_email,
+                    "password": "integration-password-789",
+                    "display_name": "New Integration Account",
+                },
+            )
+            assert registered_again.status_code == 201
+            created_user_ids.append(uuid.UUID(registered_again.json()["user"]["id"]))
     finally:
         async with SessionFactory() as session, session.begin():
-            user_ids = list(
-                (
-                    await session.scalars(
-                        select(User.id).where(User.email.in_([owner_email, partner_email]))
-                    )
-                ).all()
-            )
+            user_ids = created_user_ids
             if user_ids:
                 couple_id = await session.scalar(
                     select(CoupleMember.couple_id).where(CoupleMember.user_id.in_(user_ids)).limit(1)
@@ -126,10 +174,20 @@ async def test_authenticated_write_reuses_the_authentication_transaction() -> No
                         ExpenseRequest.couple_id == couple_id
                     )
                     await session.execute(
-                        delete(OutboxEvent).where(OutboxEvent.aggregate_id.in_(request_ids))
+                        delete(OutboxEvent).where(
+                            or_(
+                                OutboxEvent.aggregate_id.in_(request_ids),
+                                OutboxEvent.aggregate_id == couple_id,
+                            )
+                        )
                     )
                     await session.execute(
-                        delete(AuditEvent).where(AuditEvent.couple_id == couple_id)
+                        delete(AuditEvent).where(
+                            or_(
+                                AuditEvent.couple_id == couple_id,
+                                AuditEvent.actor_id.in_(user_ids),
+                            )
+                        )
                     )
                     await session.execute(delete(Expense).where(Expense.couple_id == couple_id))
                     await session.execute(

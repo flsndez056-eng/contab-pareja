@@ -7,12 +7,16 @@ import androidx.lifecycle.viewModelScope
 import com.flsndez.contabpareja.ContabApplication
 import com.flsndez.contabpareja.data.local.CategoryEntity
 import com.flsndez.contabpareja.data.local.ExpenseRequestEntity
+import com.flsndez.contabpareja.data.remote.CoupleHistoryItemDto
 import com.flsndez.contabpareja.data.remote.CoupleStateDto
 import com.flsndez.contabpareja.data.remote.CreateExpenseBody
+import com.flsndez.contabpareja.data.remote.InvitationDto
+import com.flsndez.contabpareja.data.remote.InvitationPreviewDto
 import com.flsndez.contabpareja.data.remote.ReportSummaryDto
 import com.flsndez.contabpareja.data.remote.UserDto
 import com.google.firebase.messaging.FirebaseMessaging
 import java.time.Instant
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -26,6 +30,8 @@ enum class AppScreen {
     FORGOT_PASSWORD,
     RESET_PASSWORD,
     COUPLE_SETUP,
+    INVITE_PREVIEW,
+    RELATIONSHIP_HISTORY,
     HOME,
     CREATE_EXPENSE,
     ACCOUNT_SECURITY,
@@ -41,6 +47,10 @@ internal fun accountActionPath(scheme: String?, host: String?, path: String?): S
     return actionPath?.takeIf { it in setOf("/reset-password", "/verify-email") }
 }
 
+internal fun isInvitationLink(scheme: String?, host: String?, path: String?): Boolean =
+    (scheme == "contabpareja" && host == "invite") ||
+        (scheme == "https" && host == "contab.siptrapollo.online" && path == "/invite")
+
 data class MainUiState(
     val screen: AppScreen = AppScreen.AUTH,
     val loading: Boolean = true,
@@ -50,7 +60,10 @@ data class MainUiState(
     val requests: List<ExpenseRequestEntity> = emptyList(),
     val categories: List<CategoryEntity> = emptyList(),
     val report: ReportSummaryDto? = null,
-    val invitationCode: String? = null,
+    val invitation: InvitationDto? = null,
+    val pendingInviteToken: String = "",
+    val invitePreview: InvitationPreviewDto? = null,
+    val coupleHistory: List<CoupleHistoryItemDto> = emptyList(),
     val resetToken: String = "",
     val passwordResetRequestSent: Boolean = false,
     val error: String? = null,
@@ -64,7 +77,11 @@ internal fun signedOutStateAfterBootstrap(current: MainUiState): MainUiState =
     if (shouldPreservePasswordReset(current.screen)) {
         current.copy(loading = false, busy = false)
     } else {
-        MainUiState(loading = false, notice = current.notice)
+        MainUiState(
+            loading = false,
+            pendingInviteToken = current.pendingInviteToken,
+            notice = current.notice,
+        )
     }
 
 internal fun passwordResetRequestSucceeded(
@@ -100,6 +117,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun bootstrap() = launchTask(showBusy = false) {
+        val storedInvite = container.authRepository.pendingInviteToken().orEmpty()
+        if (_state.value.pendingInviteToken.isBlank() && storedInvite.isNotBlank()) {
+            _state.update { it.copy(pendingInviteToken = storedInvite) }
+        }
         val restored = container.authRepository.restoreSession()
         if (shouldPreservePasswordReset(_state.value.screen)) {
             _state.update { it.copy(loading = false) }
@@ -123,7 +144,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun showAuth() = _state.update {
-        MainUiState(screen = AppScreen.AUTH, loading = false, notice = it.notice)
+        MainUiState(
+            screen = AppScreen.AUTH,
+            loading = false,
+            pendingInviteToken = it.pendingInviteToken,
+            notice = it.notice,
+        )
     }
 
     fun showForgotPassword() = _state.update {
@@ -158,10 +184,27 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun handleDeepLink(uri: Uri?) {
         val safeUri = uri ?: return
-        val path = accountActionPath(safeUri.scheme, safeUri.host, safeUri.path) ?: return
         val token = safeUri.getQueryParameter("token")?.trim().orEmpty()
         if (token.isBlank()) return
-        when (path) {
+        if (isInvitationLink(safeUri.scheme, safeUri.host, safeUri.path)) {
+            container.authRepository.rememberPendingInvite(token)
+            _state.update {
+                it.copy(
+                    pendingInviteToken = token,
+                    loading = it.loading && it.user == null,
+                    notice = if (it.user == null) {
+                        "Inicia sesión o crea una cuenta para revisar la invitación."
+                    } else {
+                        it.notice
+                    },
+                )
+            }
+            if (_state.value.user != null) {
+                launchTask { loadAuthenticatedState() }
+            }
+            return
+        }
+        when (accountActionPath(safeUri.scheme, safeUri.host, safeUri.path)) {
             "/reset-password" -> showResetPassword(token)
             "/verify-email" -> confirmEmail(token)
         }
@@ -172,13 +215,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun closeAccountSecurity() = _state.update {
-        it.copy(
-            screen = if (it.coupleState?.couple == null) {
-                AppScreen.COUPLE_SETUP
-            } else {
-                AppScreen.HOME
-            },
-        )
+        it.copy(screen = destinationForCurrentRelationship(it))
     }
 
     fun requestEmailVerification() = launchTask {
@@ -191,6 +228,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _state.update {
             it.copy(user = if (it.user?.id == user.id) user else it.user, notice = "Correo verificado.")
         }
+        if (_state.value.user?.id == user.id) loadAuthenticatedState()
     }
 
     fun changePassword(currentPassword: String, newPassword: String) = launchTask {
@@ -211,19 +249,89 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun createCouple(name: String) = launchTask {
         val couple = container.coupleRepository.create(name)
-        _state.update { it.copy(coupleState = couple, screen = AppScreen.HOME) }
+        val invitation = container.coupleRepository.invite()
+        _state.update {
+            it.copy(coupleState = couple, invitation = invitation, screen = AppScreen.HOME)
+        }
         refreshData()
     }
 
     fun joinCouple(code: String) = launchTask {
-        val couple = container.coupleRepository.join(code)
-        _state.update { it.copy(coupleState = couple, screen = AppScreen.HOME) }
+        val couple = container.coupleRepository.joinCode(code)
+        container.authRepository.clearPendingInvite()
+        _state.update {
+            it.copy(
+                coupleState = couple,
+                pendingInviteToken = "",
+                invitePreview = null,
+                screen = AppScreen.HOME,
+            )
+        }
         refreshData()
     }
 
     fun createInvitation() = launchTask {
         val invitation = container.coupleRepository.invite()
-        _state.update { it.copy(invitationCode = invitation.code) }
+        _state.update { it.copy(invitation = invitation) }
+    }
+
+    fun acceptInvitation() = launchTask {
+        val token = _state.value.pendingInviteToken.ifBlank {
+            error("La invitación ya no está disponible.")
+        }
+        val couple = container.coupleRepository.joinToken(token)
+        container.authRepository.clearPendingInvite()
+        _state.update {
+            it.copy(
+                coupleState = couple,
+                pendingInviteToken = "",
+                invitePreview = null,
+                screen = AppScreen.HOME,
+                notice = "Ya estás conectado con tu pareja.",
+            )
+        }
+        refreshData()
+    }
+
+    fun declineInvitation() {
+        container.authRepository.clearPendingInvite()
+        _state.update {
+            it.copy(
+                pendingInviteToken = "",
+                invitePreview = null,
+                screen = AppScreen.COUPLE_SETUP,
+                notice = "Invitación descartada.",
+            )
+        }
+    }
+
+    fun endCouple(password: String) = launchTask {
+        container.coupleRepository.end(password)
+        container.expenseRepository.clear()
+        _state.update {
+            it.copy(coupleState = null, report = null, invitation = null)
+        }
+        loadAuthenticatedState()
+        _state.update { it.copy(notice = "La relación se cerró y quedó guardada en tu historial.") }
+    }
+
+    fun deleteAccount(password: String) = launchTask {
+        container.accountRepository.deleteAccount(password)
+        container.expenseRepository.clear()
+        container.authRepository.clearAllSessionData()
+        _state.value = MainUiState(
+            loading = false,
+            notice = "Tu cuenta fue eliminada y el correo quedó disponible para registrarte otra vez.",
+        )
+    }
+
+    fun showHistory() = launchTask {
+        val history = container.coupleRepository.history()
+        _state.update { it.copy(coupleHistory = history, screen = AppScreen.RELATIONSHIP_HISTORY) }
+    }
+
+    fun closeHistory() = _state.update {
+        it.copy(screen = destinationForCurrentRelationship(it))
     }
 
     fun refresh() = launchTask { refreshData() }
@@ -274,7 +382,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun logout() = launchTask {
         container.authRepository.logout()
-        _state.value = MainUiState(loading = false)
+        container.expenseRepository.clear()
+        _state.value = MainUiState(
+            loading = false,
+            pendingInviteToken = container.authRepository.pendingInviteToken().orEmpty(),
+        )
     }
 
     fun clearError() = _state.update { it.copy(error = null) }
@@ -287,22 +399,56 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             _state.update { it.copy(loading = false) }
             return
         }
+        var token = _state.value.pendingInviteToken.ifBlank {
+            container.authRepository.pendingInviteToken().orEmpty()
+        }
+        val preview = if (token.isNotBlank() && couple.couple == null) {
+            try {
+                container.coupleRepository.preview(token)
+            } catch (error: HttpException) {
+                if (error.code() != 404) throw error
+                container.authRepository.clearPendingInvite()
+                token = ""
+                _state.update { it.copy(notice = "La invitación venció o ya fue utilizada.") }
+                null
+            }
+        } else {
+            null
+        }
         _state.update {
             it.copy(
                 loading = false,
                 user = user,
                 coupleState = couple,
-                screen = if (couple.couple == null) AppScreen.COUPLE_SETUP else AppScreen.HOME,
+                pendingInviteToken = token,
+                invitePreview = preview,
+                screen = when {
+                    couple.couple != null -> AppScreen.HOME
+                    preview != null -> AppScreen.INVITE_PREVIEW
+                    else -> AppScreen.COUPLE_SETUP
+                },
+                notice = if (couple.couple != null && token.isNotBlank()) {
+                    "Para aceptar otra invitación, primero debes cerrar tu relación actual."
+                } else {
+                    it.notice
+                },
             )
         }
-        if (couple.couple != null) refreshData()
+        if (couple.couple != null) refreshData() else container.expenseRepository.clear()
         registerForPush()
     }
 
     private suspend fun refreshData() {
+        val couple = container.coupleRepository.state()
+        if (couple.couple == null) {
+            container.expenseRepository.clear()
+            _state.update {
+                it.copy(coupleState = couple, report = null, invitation = null, screen = AppScreen.COUPLE_SETUP)
+            }
+            return
+        }
         container.expenseRepository.sync()
         val report = runCatching { container.expenseRepository.currentMonthReport() }.getOrNull()
-        val couple = container.coupleRepository.state()
         _state.update { it.copy(report = report, coupleState = couple) }
     }
 
@@ -315,27 +461,34 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             if (showBusy) {
                 _state.update { it.copy(busy = true, error = null, notice = null) }
             }
-            runCatching { block() }
-                .onFailure { throwable ->
-                    if (throwable is HttpException && throwable.code() == 401) {
-                        container.authRepository.clearSession()
-                        _state.value = MainUiState(
-                            loading = false,
-                            error = "Tu sesión venció. Inicia sesión nuevamente.",
-                        )
-                    } else {
-                        _state.update { it.copy(error = throwable.userMessage()) }
-                    }
+            try {
+                block()
+            } catch (throwable: Throwable) {
+                if (throwable is CancellationException) throw throwable
+                if (throwable is HttpException && throwable.code() == 401) {
+                    container.authRepository.clearSession()
+                    container.expenseRepository.clear()
+                    _state.value = MainUiState(
+                        loading = false,
+                        pendingInviteToken = container.authRepository.pendingInviteToken().orEmpty(),
+                        error = "Tu sesión venció. Inicia sesión nuevamente.",
+                    )
+                } else {
+                    _state.update { it.copy(error = throwable.userMessage()) }
                 }
+            }
             _state.update { it.copy(loading = false, busy = false) }
         }
     }
 }
 
+private fun destinationForCurrentRelationship(state: MainUiState): AppScreen =
+    if (state.coupleState?.couple == null) AppScreen.COUPLE_SETUP else AppScreen.HOME
+
 private fun Throwable.userMessage(): String = when (this) {
     is HttpException -> when (code()) {
         400 -> "Revisa los datos enviados."
-        403 -> "No tienes permiso para realizar esta acción."
+        403 -> "Verifica tu correo o confirma tu contraseña para continuar."
         404 -> "No encontramos el recurso solicitado."
         409 -> "La operación entra en conflicto con el estado actual. Actualiza e intenta otra vez."
         422 -> "Hay datos inválidos o incompletos."

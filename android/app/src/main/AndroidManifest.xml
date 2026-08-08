@@ -34,6 +34,9 @@
                 <data
                     android:host="auth"
                     android:scheme="contabpareja" />
+                <data
+                    android:host="invite"
+                    android:scheme="contabpareja" />
             </intent-filter>
             <intent-filter android:autoVerify="true">
                 <action android:name="android.intent.action.VIEW" />
@@ -42,6 +45,10 @@
                 <data
                     android:host="contab.siptrapollo.online"
                     android:pathPrefix="/auth/"
+                    android:scheme="https" />
+                <data
+                    android:host="contab.siptrapollo.online"
+                    android:pathPrefix="/invite"
                     android:scheme="https" />
             </intent-filter>
         </activity>

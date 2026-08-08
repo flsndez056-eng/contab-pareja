@@ -9,9 +9,11 @@ from app.core.security import (
     decode_access_token_claims,
     hash_email_action_token,
     hash_invitation_code,
+    hash_invitation_token,
     hash_password,
     new_email_action_token,
     new_invitation_code,
+    new_invitation_token,
     new_refresh_token,
     verify_password,
 )
@@ -61,3 +63,10 @@ def test_invitation_hash_is_normalized() -> None:
     code, digest = new_invitation_code()
     assert len(code) == 9
     assert hash_invitation_code(code.lower()) == digest
+
+
+def test_invitation_tokens_are_only_persisted_as_hashes() -> None:
+    token, digest = new_invitation_token()
+    assert token != digest
+    assert hash_invitation_token(token) == digest
+    assert len(digest) == 64

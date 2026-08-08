@@ -20,18 +20,42 @@ class SecureSessionStore(context: Context) {
     private val preferences = context.getSharedPreferences("secure_session", Context.MODE_PRIVATE)
 
     fun saveRefreshToken(token: String) {
+        saveEncrypted(REFRESH_TOKEN, token)
+    }
+
+    fun refreshToken(): String? = readEncrypted(REFRESH_TOKEN)
+
+    fun clearRefreshToken() {
+        clearEncrypted(REFRESH_TOKEN)
+    }
+
+    fun savePendingInviteToken(token: String) {
+        saveEncrypted(INVITE_TOKEN, token)
+    }
+
+    fun pendingInviteToken(): String? = readEncrypted(INVITE_TOKEN)
+
+    fun clearPendingInviteToken() {
+        clearEncrypted(INVITE_TOKEN)
+    }
+
+    fun clearAll() {
+        preferences.edit { clear() }
+    }
+
+    private fun saveEncrypted(key: String, value: String) {
         val cipher = Cipher.getInstance(TRANSFORMATION)
         cipher.init(Cipher.ENCRYPT_MODE, secretKey())
-        val encrypted = cipher.doFinal(token.toByteArray(Charsets.UTF_8))
+        val encrypted = cipher.doFinal(value.toByteArray(Charsets.UTF_8))
         preferences.edit {
-            putString(KEY_TOKEN, Base64.encodeToString(encrypted, Base64.NO_WRAP))
-            putString(KEY_IV, Base64.encodeToString(cipher.iv, Base64.NO_WRAP))
+            putString(key, Base64.encodeToString(encrypted, Base64.NO_WRAP))
+            putString(ivKey(key), Base64.encodeToString(cipher.iv, Base64.NO_WRAP))
         }
     }
 
-    fun refreshToken(): String? = runCatching {
-        val encrypted = preferences.getString(KEY_TOKEN, null) ?: return null
-        val iv = preferences.getString(KEY_IV, null) ?: return null
+    private fun readEncrypted(key: String): String? = runCatching {
+        val encrypted = preferences.getString(key, null) ?: return null
+        val iv = preferences.getString(ivKey(key), null) ?: return null
         val cipher = Cipher.getInstance(TRANSFORMATION)
         cipher.init(
             Cipher.DECRYPT_MODE,
@@ -41,9 +65,14 @@ class SecureSessionStore(context: Context) {
         cipher.doFinal(Base64.decode(encrypted, Base64.NO_WRAP)).toString(Charsets.UTF_8)
     }.getOrNull()
 
-    fun clear() {
-        preferences.edit { clear() }
+    private fun clearEncrypted(key: String) {
+        preferences.edit {
+            remove(key)
+            remove(ivKey(key))
+        }
     }
+
+    private fun ivKey(key: String) = "${key}_iv"
 
     private fun secretKey(): SecretKey {
         val keyStore = KeyStore.getInstance(KEYSTORE).apply { load(null) }
@@ -66,7 +95,7 @@ class SecureSessionStore(context: Context) {
         const val KEYSTORE = "AndroidKeyStore"
         const val KEY_ALIAS = "contab_pareja_refresh_token"
         const val TRANSFORMATION = "AES/GCM/NoPadding"
-        const val KEY_TOKEN = "refresh_token"
-        const val KEY_IV = "refresh_token_iv"
+        const val REFRESH_TOKEN = "refresh_token"
+        const val INVITE_TOKEN = "pending_invite_token"
     }
 }

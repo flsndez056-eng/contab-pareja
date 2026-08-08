@@ -83,6 +83,56 @@ def _action_page(token: str, action: str) -> HTMLResponse:
     return HTMLResponse(html, headers=_SECURITY_HEADERS)
 
 
+def _invite_page(token: str) -> HTMLResponse:
+    encoded_token = quote(token, safe="")
+    deep_link = f"contabpareja://invite?token={encoded_token}"
+    safe_deep_link = escape(deep_link, quote=True)
+    html = f"""<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>Invitación · Contab Pareja</title>
+  <style>
+    :root {{ font-family: system-ui, sans-serif; color: #172033; background: #f3f6fb; }}
+    body {{
+      min-height: 100vh; margin: 0; display: grid; place-items: center;
+      padding: 24px; box-sizing: border-box;
+    }}
+    main {{
+      width: min(100%, 480px); background: white; border-radius: 20px;
+      padding: 32px; box-shadow: 0 18px 60px #1720331f;
+    }}
+    h1 {{ margin-top: 0; font-size: 1.75rem; }}
+    p {{ line-height: 1.55; }}
+    a.button {{
+      display: block; margin: 24px 0; padding: 14px 18px; border-radius: 12px;
+      color: white; background: #3157d5; text-align: center;
+      text-decoration: none; font-weight: 700;
+    }}
+    small {{ color: #596579; }}
+    @media (prefers-color-scheme: dark) {{
+      :root {{ color: #eef2f9; background: #101521; }}
+      main {{ background: #1a2232; }}
+      small {{ color: #aeb8ca; }}
+    }}
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Te invitaron a Contab Pareja</h1>
+    <p>Abre la aplicación para revisar quién te invita antes de conectar las cuentas.</p>
+    <a class="button" href="{safe_deep_link}">Abrir Contab Pareja</a>
+    <p><small>
+      La invitación vence, solo puede utilizarse una vez y siempre requiere tu confirmación.
+    </small></p>
+  </main>
+</body>
+</html>"""
+    return HTMLResponse(html, headers=_SECURITY_HEADERS)
+
+
 @router.get("/auth/reset-password", response_class=HTMLResponse, include_in_schema=False)
 async def reset_password_link(
     token: str = Query(min_length=16, max_length=512),
@@ -95,6 +145,13 @@ async def verify_email_link(
     token: str = Query(min_length=16, max_length=512),
 ) -> HTMLResponse:
     return _action_page(token, "verify-email")
+
+
+@router.get("/invite", response_class=HTMLResponse, include_in_schema=False)
+async def invitation_link(
+    token: str = Query(min_length=32, max_length=512),
+) -> HTMLResponse:
+    return _invite_page(token)
 
 
 @router.get("/.well-known/assetlinks.json", include_in_schema=False)

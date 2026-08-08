@@ -23,6 +23,12 @@ interface ContabDao {
     @Query("DELETE FROM expense_requests")
     suspend fun clearRequests()
 
+    @androidx.room.Transaction
+    suspend fun replaceAllRequests(requests: List<ExpenseRequestEntity>) {
+        clearRequests()
+        upsertRequests(requests)
+    }
+
     @Query("SELECT * FROM categories ORDER BY name")
     fun observeCategories(): Flow<List<CategoryEntity>>
 

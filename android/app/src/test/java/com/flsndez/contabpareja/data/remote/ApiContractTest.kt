@@ -42,4 +42,13 @@ class ApiContractTest {
         assertTrue(changeJson.contains("current_password"))
         assertTrue(changeJson.contains("new_password"))
     }
+
+    @Test
+    fun invitationAndDeletionUseSecureLifecycleContracts() {
+        val joinJson = gson.toJson(JoinCoupleBody(token = "secure-invite-token"))
+        val deleteJson = gson.toJson(DeleteAccountBody("password-123"))
+        assertTrue(joinJson.contains("secure-invite-token"))
+        assertFalse(joinJson.contains("code"))
+        assertTrue(deleteJson.contains("ELIMINAR"))
+    }
 }

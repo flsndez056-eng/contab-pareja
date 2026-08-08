@@ -22,7 +22,7 @@ class ExpenseRepository(
     suspend fun sync() {
         val requests = api.expenseRequests(limit = 100)
         val categories = api.categories()
-        dao.upsertRequests(requests.map { it.toEntity() })
+        dao.replaceAllRequests(requests.map { it.toEntity() })
         dao.replaceAllCategories(categories.map { it.toEntity() })
     }
 
@@ -47,5 +47,10 @@ class ExpenseRepository(
         val to = Instant.now().plus(1, ChronoUnit.DAYS)
         val from = to.minus(31, ChronoUnit.DAYS)
         return api.reportSummary(from.toString(), to.toString())
+    }
+
+    suspend fun clear() {
+        dao.clearRequests()
+        dao.clearCategories()
     }
 }

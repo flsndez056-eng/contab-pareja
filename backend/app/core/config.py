@@ -39,6 +39,7 @@ class Settings(BaseSettings):
     account_action_base_url: HttpUrl = HttpUrl(
         "https://contab.siptrapollo.online/auth"
     )
+    invitation_base_url: HttpUrl = HttpUrl("https://contab.siptrapollo.online/invite")
     android_app_cert_sha256: str = ""
 
     @field_validator("database_url")
