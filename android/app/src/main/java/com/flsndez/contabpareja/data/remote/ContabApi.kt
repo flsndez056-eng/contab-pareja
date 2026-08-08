@@ -5,6 +5,7 @@ import retrofit2.http.Body
 import retrofit2.http.DELETE
 import retrofit2.http.GET
 import retrofit2.http.Header
+import retrofit2.http.HTTP
 import retrofit2.http.POST
 import retrofit2.http.PUT
 import retrofit2.http.Path
@@ -49,7 +50,7 @@ interface ContabApi {
     @POST("api/v1/auth/sessions/revoke-all")
     suspend fun revokeAllSessions(@Body body: ReauthenticateBody): AuthResponseDto
 
-    @DELETE("api/v1/account")
+    @HTTP(method = "DELETE", path = "api/v1/account", hasBody = true)
     suspend fun deleteAccount(@Body body: DeleteAccountBody): Response<Unit>
 
     @GET("api/v1/couples/current")

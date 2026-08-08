@@ -1,11 +1,13 @@
 import asyncio
 import logging
 import uuid
+from collections.abc import Sequence
 from datetime import UTC, datetime, timedelta
+from typing import Any
 
 import firebase_admin
 from firebase_admin import messaging
-from sqlalchemy import select
+from sqlalchemy import select, update
 
 from app.core.config import settings
 from app.db.session import SessionFactory, dispose_engine
@@ -17,13 +19,13 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name
 
 def initialize_firebase() -> bool:
     try:
-        firebase_admin.get_app()
-        return True
+        app = firebase_admin.get_app()
     except ValueError:
         if not settings.fcm_project_id:
             return False
-        firebase_admin.initialize_app(options={"projectId": settings.fcm_project_id})
-        return True
+        app = firebase_admin.initialize_app(options={"projectId": settings.fcm_project_id})
+    app.credential.get_credential()
+    return True
 
 
 def notification_copy(event_type: str) -> tuple[str, str]:
@@ -36,6 +38,24 @@ def notification_copy(event_type: str) -> tuple[str, str]:
         "couple.ended": ("Conexión finalizada", "La relación quedó archivada para ambos."),
     }
     return messages.get(event_type, ("Contab Pareja", "Hay una actualización pendiente."))
+
+
+def classify_delivery_failures(
+    devices: Sequence[Device], responses: Sequence[Any]
+) -> tuple[list[uuid.UUID], list[str], int]:
+    failures = [
+        (device, result.exception)
+        for device, result in zip(devices, responses, strict=True)
+        if not result.success
+    ]
+    unregistered_ids = [
+        device.id
+        for device, error in failures
+        if isinstance(error, messaging.UnregisteredError)
+    ]
+    error_names = sorted({type(error).__name__ for _, error in failures})
+    retryable_failures = len(failures) - len(unregistered_ids)
+    return unregistered_ids, error_names, retryable_failures
 
 
 async def deliver_event(event: OutboxEvent) -> None:
@@ -72,8 +92,28 @@ async def deliver_event(event: OutboxEvent) -> None:
         ),
     )
     response = await asyncio.to_thread(messaging.send_each_for_multicast, message)
-    if response.failure_count:
-        logger.warning("FCM tuvo %s fallo(s) para %s", response.failure_count, event.id)
+    if not response.failure_count:
+        return
+
+    unregistered_ids, error_names, retryable_failures = classify_delivery_failures(
+        devices, response.responses
+    )
+    logger.warning(
+        "FCM tuvo %s fallo(s) y %s éxito(s) para %s: %s",
+        response.failure_count,
+        response.success_count,
+        event.id,
+        ", ".join(error_names),
+    )
+    if unregistered_ids:
+        async with SessionFactory() as session, session.begin():
+            await session.execute(
+                update(Device).where(Device.id.in_(unregistered_ids)).values(enabled=False)
+            )
+    if response.success_count == 0 and retryable_failures:
+        raise RuntimeError(
+            "FCM rechazó todos los destinos: " + ", ".join(error_names)
+        )
 
 
 async def process_one() -> bool:
@@ -106,6 +146,8 @@ async def process_one() -> bool:
 
 async def run() -> None:
     logger.info("Worker outbox iniciado")
+    if not initialize_firebase() and settings.is_production:
+        raise RuntimeError("FCM_PROJECT_ID no está configurado en producción.")
     try:
         while True:
             processed = await process_one()

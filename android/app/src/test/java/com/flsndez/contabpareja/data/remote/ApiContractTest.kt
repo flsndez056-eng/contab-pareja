@@ -1,9 +1,11 @@
 package com.flsndez.contabpareja.data.remote
 
 import com.google.gson.Gson
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import retrofit2.http.HTTP
 
 class ApiContractTest {
     private val gson = Gson()
@@ -50,5 +52,15 @@ class ApiContractTest {
         assertTrue(joinJson.contains("secure-invite-token"))
         assertFalse(joinJson.contains("code"))
         assertTrue(deleteJson.contains("ELIMINAR"))
+    }
+
+    @Test
+    fun accountDeletionAllowsAnHttpRequestBody() {
+        val method = ContabApi::class.java.declaredMethods.single { it.name == "deleteAccount" }
+        val annotation = requireNotNull(method.getAnnotation(HTTP::class.java))
+
+        assertEquals("DELETE", annotation.method)
+        assertEquals("api/v1/account", annotation.path)
+        assertTrue(annotation.hasBody)
     }
 }
