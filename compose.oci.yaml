@@ -19,6 +19,8 @@ x-app-environment: &app-environment
   SMTP_STARTTLS: ${SMTP_STARTTLS:-true}
   SMTP_TIMEOUT_SECONDS: ${SMTP_TIMEOUT_SECONDS:-10}
   ANDROID_DEEP_LINK_BASE: ${ANDROID_DEEP_LINK_BASE:-contabpareja://auth}
+  ACCOUNT_ACTION_BASE_URL: ${ACCOUNT_ACTION_BASE_URL:-https://contab.siptrapollo.online/auth}
+  ANDROID_APP_CERT_SHA256: ${ANDROID_APP_CERT_SHA256:-}
 
 services:
   postgres:

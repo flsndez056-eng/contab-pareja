@@ -19,7 +19,7 @@ Los códigos vencen, tienen un tiempo mínimo entre emisiones y solo se guarda s
 - `POST /api/v1/auth/email/verification/confirm`
 - `POST /api/v1/auth/sessions/revoke-all`
 
-Android admite los enlaces `contabpareja://auth/verify-email?token=...` y `contabpareja://auth/reset-password?token=...`. También permite pegar manualmente el código.
+Los correos usan enlaces HTTPS en `https://contab.siptrapollo.online/auth/`. Android los reconoce como App Links verificados y el servidor ofrece una página de respaldo con un botón para abrir `contabpareja://auth/...` y el código para copiar manualmente.
 
 ## Correo en Oracle Cloud
 
@@ -49,6 +49,8 @@ SMTP_USERNAME=<credencial SMTP de OCI>
 SMTP_PASSWORD=<contraseña SMTP de OCI>
 SMTP_STARTTLS=true
 ANDROID_DEEP_LINK_BASE=contabpareja://auth
+ACCOUNT_ACTION_BASE_URL=https://contab.siptrapollo.online/auth
+ANDROID_APP_CERT_SHA256=<huella SHA-256 del certificado que firma el APK>
 ```
 
 No guardes las credenciales SMTP en Git. Deben existir únicamente en `.env.production`, con permisos `600`.

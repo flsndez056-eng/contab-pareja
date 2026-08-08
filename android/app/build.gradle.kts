@@ -9,12 +9,12 @@ if (file("google-services.json").exists()) {
 }
 
 val productionApiBaseUrl = providers.gradleProperty("CONTAB_API_BASE_URL")
-    .orElse("https://api.example.com/")
+    .orElse("https://contab.siptrapollo.online/")
     .get()
     .let { if (it.endsWith('/')) it else "$it/" }
 
 val debugApiBaseUrl = providers.gradleProperty("CONTAB_DEBUG_API_BASE_URL")
-    .orElse("http://10.0.2.2:8000/")
+    .orElse(productionApiBaseUrl)
     .get()
     .let { if (it.endsWith('/')) it else "$it/" }
 
@@ -26,8 +26,8 @@ android {
         applicationId = "com.flsndez.contabpareja"
         minSdk = 23
         targetSdk = 37
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = 2
+        versionName = "0.2.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true
