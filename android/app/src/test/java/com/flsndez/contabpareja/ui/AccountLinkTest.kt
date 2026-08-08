@@ -39,6 +39,14 @@ class AccountLinkTest {
     }
 
     @Test
+    fun recognizesOnlySupportedInvitationOrigins() {
+        assertTrue(isInvitationLink("contabpareja", "invite", null))
+        assertTrue(isInvitationLink("https", "contab.siptrapollo.online", "/invite"))
+        assertFalse(isInvitationLink("https", "example.com", "/invite"))
+        assertFalse(isInvitationLink("https", "contab.siptrapollo.online", "/other"))
+    }
+
+    @Test
     fun preservesPasswordResetLinkWhileSignedOutBootstrapFinishes() {
         val result = signedOutStateAfterBootstrap(
             MainUiState(
@@ -50,6 +58,17 @@ class AccountLinkTest {
 
         assertEquals(AppScreen.RESET_PASSWORD, result.screen)
         assertEquals("recovery-token", result.resetToken)
+        assertFalse(result.loading)
+    }
+
+    @Test
+    fun preservesPendingInvitationWhileSignedOutBootstrapFinishes() {
+        val result = signedOutStateAfterBootstrap(
+            MainUiState(loading = true, pendingInviteToken = "invite-token"),
+        )
+
+        assertEquals(AppScreen.AUTH, result.screen)
+        assertEquals("invite-token", result.pendingInviteToken)
         assertFalse(result.loading)
     }
 

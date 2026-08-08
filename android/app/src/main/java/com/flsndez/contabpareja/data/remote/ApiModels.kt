@@ -20,6 +20,7 @@ data class ChangePasswordBody(
     @SerializedName("new_password") val newPassword: String,
 )
 data class ReauthenticateBody(val password: String)
+data class DeleteAccountBody(val password: String, val confirmation: String = "ELIMINAR")
 data class RefreshBody(@SerializedName("refresh_token") val refreshToken: String)
 data class LogoutBody(@SerializedName("refresh_token") val refreshToken: String)
 data class MessageDto(val message: String)
@@ -47,7 +48,8 @@ data class CreateCoupleBody(
     val timezone: String = "America/Santo_Domingo",
 )
 
-data class JoinCoupleBody(val code: String)
+data class JoinCoupleBody(val code: String? = null, val token: String? = null)
+data class EndCoupleBody(val password: String)
 
 data class CoupleDto(
     val id: String,
@@ -55,6 +57,7 @@ data class CoupleDto(
     @SerializedName("default_currency") val defaultCurrency: String,
     val timezone: String,
     @SerializedName("created_at") val createdAt: String,
+    @SerializedName("ended_at") val endedAt: String?,
 )
 
 data class MemberDto(
@@ -67,7 +70,24 @@ data class MemberDto(
 )
 
 data class CoupleStateDto(val couple: CoupleDto?, val members: List<MemberDto>)
-data class InvitationDto(val code: String, @SerializedName("expires_at") val expiresAt: String)
+data class InvitationDto(
+    val code: String,
+    @SerializedName("expires_at") val expiresAt: String,
+    @SerializedName("invite_url") val inviteUrl: String,
+)
+
+data class InvitationPreviewDto(
+    @SerializedName("couple_name") val coupleName: String,
+    @SerializedName("inviter_name") val inviterName: String,
+    @SerializedName("expires_at") val expiresAt: String,
+)
+
+data class CoupleHistoryItemDto(
+    val couple: CoupleDto,
+    val members: List<MemberDto>,
+    @SerializedName("expense_count") val expenseCount: Int,
+    val total: String,
+)
 
 data class CategoryDto(val id: String, val slug: String, val name: String, val icon: String?)
 

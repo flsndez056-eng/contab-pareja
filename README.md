@@ -2,6 +2,8 @@
 
 Aplicación móvil para que dos miembros de una pareja soliciten, aprueben y auditen gastos compartidos.
 
+La conexión se realiza mediante enlace HTTPS de un solo uso, QR o código temporal. Cada usuario puede cerrar una relación, conservar el historial aprobado y conectar una pareja diferente. La eliminación de cuenta anonimiza la identidad y libera el correo para un registro futuro.
+
 ## Principio central
 
 Una solicitud pendiente no es un gasto contable. Solo una decisión válida del otro miembro crea un gasto aprobado. Todas las transiciones quedan auditadas.

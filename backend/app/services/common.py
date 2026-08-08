@@ -8,7 +8,12 @@ from app.models.entities import CoupleMember
 
 
 async def require_membership(session: AsyncSession, user_id: uuid.UUID) -> CoupleMember:
-    member = await session.scalar(select(CoupleMember).where(CoupleMember.user_id == user_id))
+    member = await session.scalar(
+        select(CoupleMember).where(
+            CoupleMember.user_id == user_id,
+            CoupleMember.left_at.is_(None),
+        )
+    )
     if member is None:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -22,6 +27,7 @@ async def require_complete_couple(session: AsyncSession, member: CoupleMember) -
         select(CoupleMember).where(
             CoupleMember.couple_id == member.couple_id,
             CoupleMember.user_id != member.user_id,
+            CoupleMember.left_at.is_(None),
         )
     )
     if partner is None:

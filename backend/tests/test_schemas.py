@@ -5,7 +5,13 @@ from decimal import Decimal
 import pytest
 from pydantic import ValidationError
 
-from app.schemas.auth import ForgotPasswordRequest, RegisterRequest, ResetPasswordRequest
+from app.schemas.auth import (
+    DeleteAccountRequest,
+    ForgotPasswordRequest,
+    RegisterRequest,
+    ResetPasswordRequest,
+)
+from app.schemas.couples import JoinCoupleRequest
 from app.schemas.devices import RegisterDeviceRequest
 from app.schemas.expenses import CreateExpenseRequest, DecisionRequest
 
@@ -73,3 +79,20 @@ def test_device_registration_uses_firebase_installation_id() -> None:
     )
     assert request.fcm_registration_id == "firebase-installation-123"
     assert "fcm_token" not in request.model_dump()
+
+
+def test_join_couple_accepts_exactly_one_invitation_credential() -> None:
+    invitation_value = "i" * 48
+    assert JoinCoupleRequest(code="ABCD-EFGH").code == "ABCD-EFGH"
+    assert JoinCoupleRequest(token=invitation_value).token == invitation_value
+    with pytest.raises(ValidationError):
+        JoinCoupleRequest()
+    with pytest.raises(ValidationError):
+        JoinCoupleRequest(code="ABCD-EFGH", token=invitation_value)
+
+
+def test_account_deletion_requires_explicit_confirmation() -> None:
+    request = DeleteAccountRequest(password="a-secure-password", confirmation="ELIMINAR")
+    assert request.confirmation == "ELIMINAR"
+    with pytest.raises(ValidationError):
+        DeleteAccountRequest(password="a-secure-password", confirmation="BORRAR")

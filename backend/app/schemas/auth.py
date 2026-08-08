@@ -1,5 +1,6 @@
 import uuid
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
@@ -55,6 +56,11 @@ class ChangePasswordRequest(BaseModel):
 
 class ReauthenticateRequest(BaseModel):
     password: str = Field(min_length=1, max_length=128)
+
+
+class DeleteAccountRequest(BaseModel):
+    password: str = Field(min_length=1, max_length=128)
+    confirmation: Literal["ELIMINAR"]
 
 
 class RefreshRequest(BaseModel):

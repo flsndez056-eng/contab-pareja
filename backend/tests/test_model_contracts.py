@@ -4,6 +4,8 @@ from app.models.entities import (
     Expense,
     ExpenseDecision,
     IdempotencyRecord,
+    Invitation,
+    User,
 )
 
 
@@ -30,3 +32,11 @@ def test_email_action_token_is_unique_and_has_a_valid_purpose() -> None:
     names = constraint_names(EmailActionToken)
     assert "uq_email_action_tokens_token_hash" in names
     assert "ck_email_action_tokens_valid_purpose" in names
+
+
+def test_lifecycle_columns_and_secure_invitation_token_exist() -> None:
+    assert "deleted_at" in User.__table__.columns
+    assert "left_at" in CoupleMember.__table__.columns
+    assert "token_hash" in Invitation.__table__.columns
+    index_names = {index.name for index in CoupleMember.__table__.indexes}
+    assert "uq_couple_members_active_user" in index_names

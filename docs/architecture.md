@@ -27,6 +27,7 @@ Monolito modular con una base PostgreSQL. La consistencia del gasto y su aprobac
 
 - `auth`: registro, login, refresh y cierre de sesión.
 - `couples`: pareja, miembros e invitaciones.
+- `accounts`: baja, anonimización y revocación total de acceso.
 - `expenses`: solicitudes, decisiones y libro aprobado.
 - `reports`: agregaciones exclusivamente de gastos aprobados.
 - `devices`: instalaciones Android y Firebase Installation IDs (FID).
@@ -35,6 +36,9 @@ Monolito modular con una base PostgreSQL. La consistencia del gasto y su aprobac
 ## Modelo de concurrencia
 
 - Una pareja acepta como máximo dos miembros activos.
+- Un usuario solo puede tener una relación activa, pero puede conservar varias relaciones finalizadas.
+- Cerrar una relación cancela solicitudes pendientes, revoca invitaciones y no modifica gastos aprobados.
+- Una invitación usa un token aleatorio de un solo uso almacenado únicamente como hash; el código corto es un respaldo manual.
 - Una solicitud solo cambia desde `pending` una vez.
 - `expense.request_id` es único, por lo que una aprobación no puede duplicar el gasto.
 - Las escrituras móviles repetidas usan `Idempotency-Key`.

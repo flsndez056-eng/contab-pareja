@@ -62,7 +62,7 @@ class AppContainer(context: Context) {
         "contab-pareja.db",
     ).build()
 
-    val coupleRepository = CoupleRepository(api)
+    val coupleRepository = CoupleRepository(api, publicApi)
     val accountRepository = AccountRepository(api)
     val expenseRepository = ExpenseRepository(api, database.dao())
     val deviceRepository = DeviceRepository(context, api)

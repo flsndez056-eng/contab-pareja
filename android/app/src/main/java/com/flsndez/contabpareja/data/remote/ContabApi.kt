@@ -31,6 +31,9 @@ interface PublicApi {
 
     @POST("api/v1/auth/email/verification/confirm")
     suspend fun confirmEmail(@Body body: ConfirmEmailBody): UserDto
+
+    @GET("api/v1/couples/invitations/preview")
+    suspend fun previewInvitation(@Query("token") token: String): InvitationPreviewDto
 }
 
 interface ContabApi {
@@ -46,8 +49,14 @@ interface ContabApi {
     @POST("api/v1/auth/sessions/revoke-all")
     suspend fun revokeAllSessions(@Body body: ReauthenticateBody): AuthResponseDto
 
+    @DELETE("api/v1/account")
+    suspend fun deleteAccount(@Body body: DeleteAccountBody): Response<Unit>
+
     @GET("api/v1/couples/current")
     suspend fun currentCouple(): CoupleStateDto
+
+    @GET("api/v1/couples/history")
+    suspend fun coupleHistory(): List<CoupleHistoryItemDto>
 
     @POST("api/v1/couples")
     suspend fun createCouple(@Body body: CreateCoupleBody): CoupleDto
@@ -57,6 +66,9 @@ interface ContabApi {
 
     @POST("api/v1/couples/join")
     suspend fun joinCouple(@Body body: JoinCoupleBody): CoupleDto
+
+    @POST("api/v1/couples/current/end")
+    suspend fun endCouple(@Body body: EndCoupleBody): Response<Unit>
 
     @GET("api/v1/categories")
     suspend fun categories(): List<CategoryDto>

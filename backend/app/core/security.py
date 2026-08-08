@@ -94,3 +94,12 @@ def new_invitation_code() -> tuple[str, str]:
 def hash_invitation_code(code: str) -> str:
     normalized = code.strip().upper()
     return hashlib.sha256(normalized.encode("ascii")).hexdigest()
+
+
+def new_invitation_token() -> tuple[str, str]:
+    raw = secrets.token_urlsafe(48)
+    return raw, hash_invitation_token(raw)
+
+
+def hash_invitation_token(raw: str) -> str:
+    return hashlib.sha256(raw.strip().encode("utf-8")).hexdigest()

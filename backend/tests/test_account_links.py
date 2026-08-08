@@ -31,6 +31,17 @@ def test_action_page_escapes_untrusted_token() -> None:
     assert "&lt;script&gt;alert(1)&lt;/script&gt;" in response.text
 
 
+def test_invitation_page_opens_android_and_keeps_manual_fallback() -> None:
+    token = "safe-invitation-token-12345678901234567890"  # noqa: S105
+
+    response = client.get("/invite", params={"token": token})
+
+    assert response.status_code == 200
+    assert f"contabpareja://invite?token={token}" in response.text
+    assert token in response.text
+    assert response.headers["referrer-policy"] == "no-referrer"
+
+
 def test_asset_links_publishes_configured_certificate(monkeypatch) -> None:
     fingerprint = "AA:BB:CC"
     monkeypatch.setattr(settings, "android_app_cert_sha256", fingerprint)

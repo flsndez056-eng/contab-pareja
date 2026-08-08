@@ -1,7 +1,8 @@
 import uuid
 from datetime import datetime
+from typing import Self
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 class CreateCoupleRequest(BaseModel):
@@ -25,6 +26,7 @@ class CoupleResponse(BaseModel):
     default_currency: str
     timezone: str
     created_at: datetime
+    ended_at: datetime | None
 
 
 class MemberResponse(BaseModel):
@@ -44,12 +46,37 @@ class CoupleStateResponse(BaseModel):
 class InvitationResponse(BaseModel):
     code: str
     expires_at: datetime
+    invite_url: str
+
+
+class InvitationPreviewResponse(BaseModel):
+    couple_name: str
+    inviter_name: str
+    expires_at: datetime
 
 
 class JoinCoupleRequest(BaseModel):
-    code: str = Field(min_length=9, max_length=9)
+    code: str | None = Field(default=None, min_length=9, max_length=9)
+    token: str | None = Field(default=None, min_length=32, max_length=512)
 
     @field_validator("code")
     @classmethod
-    def normalize_code(cls, value: str) -> str:
-        return value.strip().upper()
+    def normalize_code(cls, value: str | None) -> str | None:
+        return value.strip().upper() if value is not None else None
+
+    @model_validator(mode="after")
+    def exactly_one_credential(self) -> Self:
+        if (self.code is None) == (self.token is None):
+            raise ValueError("Envía un código o un token de invitación.")
+        return self
+
+
+class EndCoupleRequest(BaseModel):
+    password: str = Field(min_length=1, max_length=128)
+
+
+class CoupleHistoryItem(BaseModel):
+    couple: CoupleResponse
+    members: list[MemberResponse]
+    expense_count: int
+    total: str
