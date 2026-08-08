@@ -32,11 +32,13 @@ enum class AppScreen {
 }
 
 internal fun accountActionPath(scheme: String?, host: String?, path: String?): String? {
-    val supportedOrigin = (scheme == "contabpareja" && host == "auth") ||
-        (scheme == "https" && host == "contab.siptrapollo.online")
-    return path?.takeIf {
-        supportedOrigin && it in setOf("/reset-password", "/verify-email")
+    val actionPath = when {
+        scheme == "contabpareja" && host == "auth" -> path
+        scheme == "https" && host == "contab.siptrapollo.online" &&
+            path?.startsWith("/auth/") == true -> path.removePrefix("/auth")
+        else -> null
     }
+    return actionPath?.takeIf { it in setOf("/reset-password", "/verify-email") }
 }
 
 data class MainUiState(
