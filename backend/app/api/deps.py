@@ -5,7 +5,7 @@ from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
-from app.core.security import TokenError, decode_access_token
+from app.core.security import TokenError, decode_access_token_claims
 from app.db.session import get_session
 from app.models.entities import User
 
@@ -22,11 +22,11 @@ async def get_current_user(
         headers={"WWW-Authenticate": "Bearer"},
     )
     try:
-        user_id = decode_access_token(token)
+        claims = decode_access_token_claims(token)
     except TokenError as exc:
         raise credentials_error from exc
-    user = await session.get(User, user_id)
-    if user is None or not user.is_active:
+    user = await session.get(User, claims.user_id)
+    if user is None or not user.is_active or user.auth_version != claims.auth_version:
         raise credentials_error
     return user
 

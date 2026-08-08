@@ -30,6 +30,33 @@ class LoginRequest(BaseModel):
         return str(value).strip().casefold()
 
 
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+    @field_validator("email")
+    @classmethod
+    def normalize_email(cls, value: EmailStr) -> str:
+        return str(value).strip().casefold()
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str = Field(min_length=32, max_length=512)
+    new_password: str = Field(min_length=12, max_length=128)
+
+
+class ConfirmEmailRequest(BaseModel):
+    token: str = Field(min_length=32, max_length=512)
+
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str = Field(min_length=1, max_length=128)
+    new_password: str = Field(min_length=12, max_length=128)
+
+
+class ReauthenticateRequest(BaseModel):
+    password: str = Field(min_length=1, max_length=128)
+
+
 class RefreshRequest(BaseModel):
     refresh_token: str = Field(min_length=32, max_length=512)
 
@@ -58,3 +85,7 @@ class UserResponse(BaseModel):
 class AuthResponse(BaseModel):
     user: UserResponse
     tokens: TokenPair
+
+
+class MessageResponse(BaseModel):
+    message: str

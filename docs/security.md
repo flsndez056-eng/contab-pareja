@@ -6,6 +6,8 @@
 - Una aprobación bloquea la solicitud en PostgreSQL y crea un gasto una sola vez.
 - Las contraseñas se protegen con Argon2; los refresh tokens se rotan y se guardan como hash.
 - Android cifra el refresh token con AES-GCM y una clave no exportable de Android Keystore.
+- Los códigos de verificación y recuperación son de un solo uso; solo se almacena su hash.
+- Cambiar o restablecer la contraseña incrementa `auth_version` y revoca todas las sesiones previas.
 - La app no incluye secretos del servidor, credenciales de Firebase Admin ni contraseñas de base de datos.
 - Las notificaciones muestran texto genérico y privacidad de pantalla bloqueada; los detalles se consultan por HTTPS.
 - FCM solo despierta/sincroniza la app. PostgreSQL sigue siendo la fuente de verdad.

@@ -1,6 +1,7 @@
 package com.flsndez.contabpareja.ui
 
 import android.app.Application
+import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.flsndez.contabpareja.ContabApplication
@@ -20,7 +21,15 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import retrofit2.HttpException
 
-enum class AppScreen { AUTH, COUPLE_SETUP, HOME, CREATE_EXPENSE }
+enum class AppScreen {
+    AUTH,
+    FORGOT_PASSWORD,
+    RESET_PASSWORD,
+    COUPLE_SETUP,
+    HOME,
+    CREATE_EXPENSE,
+    ACCOUNT_SECURITY,
+}
 
 data class MainUiState(
     val screen: AppScreen = AppScreen.AUTH,
@@ -32,7 +41,9 @@ data class MainUiState(
     val categories: List<CategoryEntity> = emptyList(),
     val report: ReportSummaryDto? = null,
     val invitationCode: String? = null,
+    val resetToken: String = "",
     val error: String? = null,
+    val notice: String? = null,
 )
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
@@ -69,6 +80,84 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun register(name: String, email: String, password: String) = launchTask {
         container.authRepository.register(name, email, password)
         loadAuthenticatedState()
+    }
+
+    fun showAuth() = _state.update {
+        MainUiState(screen = AppScreen.AUTH, loading = false, notice = it.notice)
+    }
+
+    fun showForgotPassword() = _state.update {
+        it.copy(screen = AppScreen.FORGOT_PASSWORD, error = null)
+    }
+
+    fun showResetPassword(token: String = "") = _state.update {
+        it.copy(screen = AppScreen.RESET_PASSWORD, resetToken = token, error = null)
+    }
+
+    fun requestPasswordReset(email: String) = launchTask {
+        val message = container.authRepository.forgotPassword(email)
+        _state.update { it.copy(notice = message) }
+    }
+
+    fun resetPassword(token: String, newPassword: String) = launchTask {
+        container.authRepository.resetPassword(token, newPassword)
+        _state.value = MainUiState(
+            screen = AppScreen.AUTH,
+            loading = false,
+            notice = "Contraseña actualizada. Ya puedes iniciar sesión.",
+        )
+    }
+
+    fun handleDeepLink(uri: Uri?) {
+        if (uri?.scheme != "contabpareja" || uri.host != "auth") return
+        val token = uri.getQueryParameter("token")?.trim().orEmpty()
+        if (token.isBlank()) return
+        when (uri.path) {
+            "/reset-password" -> showResetPassword(token)
+            "/verify-email" -> confirmEmail(token)
+        }
+    }
+
+    fun showAccountSecurity() = _state.update {
+        it.copy(screen = AppScreen.ACCOUNT_SECURITY, error = null)
+    }
+
+    fun closeAccountSecurity() = _state.update {
+        it.copy(
+            screen = if (it.coupleState?.couple == null) {
+                AppScreen.COUPLE_SETUP
+            } else {
+                AppScreen.HOME
+            },
+        )
+    }
+
+    fun requestEmailVerification() = launchTask {
+        val message = container.accountRepository.requestEmailVerification()
+        _state.update { it.copy(notice = message) }
+    }
+
+    fun confirmEmail(token: String) = launchTask {
+        val user = container.authRepository.confirmEmail(token)
+        _state.update {
+            it.copy(user = if (it.user?.id == user.id) user else it.user, notice = "Correo verificado.")
+        }
+    }
+
+    fun changePassword(currentPassword: String, newPassword: String) = launchTask {
+        val response = container.accountRepository.changePassword(currentPassword, newPassword)
+        container.authRepository.accept(response)
+        _state.update {
+            it.copy(user = response.user, notice = "Contraseña actualizada y sesiones anteriores cerradas.")
+        }
+    }
+
+    fun revokeAllSessions(password: String) = launchTask {
+        val response = container.accountRepository.revokeAllSessions(password)
+        container.authRepository.accept(response)
+        _state.update {
+            it.copy(user = response.user, notice = "Las demás sesiones fueron cerradas.")
+        }
     }
 
     fun createCouple(name: String) = launchTask {
@@ -140,6 +229,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun clearError() = _state.update { it.copy(error = null) }
+    fun clearNotice() = _state.update { it.copy(notice = null) }
 
     private suspend fun loadAuthenticatedState() {
         val user = container.accountRepository.me()

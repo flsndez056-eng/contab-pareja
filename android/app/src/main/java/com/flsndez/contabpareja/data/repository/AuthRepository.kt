@@ -3,11 +3,15 @@ package com.flsndez.contabpareja.data.repository
 import com.flsndez.contabpareja.core.SecureSessionStore
 import com.flsndez.contabpareja.core.SessionMemory
 import com.flsndez.contabpareja.data.remote.AuthResponseDto
+import com.flsndez.contabpareja.data.remote.ConfirmEmailBody
+import com.flsndez.contabpareja.data.remote.ForgotPasswordBody
 import com.flsndez.contabpareja.data.remote.LoginBody
 import com.flsndez.contabpareja.data.remote.LogoutBody
 import com.flsndez.contabpareja.data.remote.PublicApi
 import com.flsndez.contabpareja.data.remote.RefreshBody
 import com.flsndez.contabpareja.data.remote.RegisterBody
+import com.flsndez.contabpareja.data.remote.ResetPasswordBody
+import com.flsndez.contabpareja.data.remote.UserDto
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import retrofit2.HttpException
@@ -24,6 +28,17 @@ class AuthRepository(
 
     suspend fun login(email: String, password: String): AuthResponseDto =
         api.login(LoginBody(email.trim(), password)).also(::persist)
+
+    suspend fun forgotPassword(email: String): String =
+        api.forgotPassword(ForgotPasswordBody(email.trim())).message
+
+    suspend fun resetPassword(token: String, newPassword: String) {
+        api.resetPassword(ResetPasswordBody(token.trim(), newPassword))
+        clearSession()
+    }
+
+    suspend fun confirmEmail(token: String): UserDto =
+        api.confirmEmail(ConfirmEmailBody(token.trim()))
 
     suspend fun restoreSession(): Boolean = refreshAccessToken() != null
 
@@ -51,6 +66,8 @@ class AuthRepository(
         session.accessToken = null
         secureStore.clear()
     }
+
+    fun accept(response: AuthResponseDto) = persist(response)
 
     private fun persist(response: AuthResponseDto) {
         session.accessToken = response.tokens.accessToken

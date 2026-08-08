@@ -6,6 +6,12 @@ def test_openapi_exposes_versioned_product_routes() -> None:
     expected = {
         "/api/v1/auth/register",
         "/api/v1/auth/login",
+        "/api/v1/auth/password/forgot",
+        "/api/v1/auth/password/reset",
+        "/api/v1/auth/password/change",
+        "/api/v1/auth/email/verification/request",
+        "/api/v1/auth/email/verification/confirm",
+        "/api/v1/auth/sessions/revoke-all",
         "/api/v1/couples",
         "/api/v1/couples/join",
         "/api/v1/expense-requests",

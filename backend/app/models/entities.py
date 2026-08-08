@@ -43,6 +43,11 @@ class PaymentSource(StrEnum):
     JOINT = "joint"
 
 
+class EmailActionPurpose(StrEnum):
+    VERIFY_EMAIL = "verify_email"
+    RESET_PASSWORD = "reset_password"  # noqa: S105 - action type, not a credential
+
+
 class User(Base):
     __tablename__ = "users"
 
@@ -52,9 +57,32 @@ class User(Base):
     display_name: Mapped[str] = mapped_column(String(80))
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
     email_verified: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    auth_version: Mapped[int] = mapped_column(Integer, default=1, server_default="1")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+
+class EmailActionToken(Base):
+    __tablename__ = "email_action_tokens"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    purpose: Mapped[str] = mapped_column(String(32))
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    __table_args__ = (
+        CheckConstraint(
+            "purpose IN ('verify_email', 'reset_password')",
+            name="valid_purpose",
+        ),
+        Index("ix_email_action_tokens_active", "user_id", "purpose", "expires_at"),
     )
 
 
