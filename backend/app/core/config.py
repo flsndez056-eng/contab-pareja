@@ -1,7 +1,7 @@
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import EmailStr, Field, SecretStr, field_validator
+from pydantic import EmailStr, Field, HttpUrl, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -36,6 +36,10 @@ class Settings(BaseSettings):
     smtp_starttls: bool = True
     smtp_timeout_seconds: int = Field(default=10, ge=3, le=30)
     android_deep_link_base: str = "contabpareja://auth"
+    account_action_base_url: HttpUrl = HttpUrl(
+        "https://contab.siptrapollo.online/auth"
+    )
+    android_app_cert_sha256: str = ""
 
     @field_validator("database_url")
     @classmethod

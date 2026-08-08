@@ -51,7 +51,8 @@ async def send_account_email(to_address: str, subject: str, body: str) -> bool:
 
 
 async def send_verification_email(to_address: str, display_name: str, token: str) -> bool:
-    link = f"{settings.android_deep_link_base}/verify-email?token={quote(token, safe='')}"
+    base_url = str(settings.account_action_base_url).rstrip("/")
+    link = f"{base_url}/verify-email?token={quote(token, safe='')}"
     body = (
         f"Hola, {display_name}.\n\n"
         "Confirma tu correo de Contab Pareja abriendo este enlace:\n"
@@ -64,7 +65,8 @@ async def send_verification_email(to_address: str, display_name: str, token: str
 
 
 async def send_password_reset_email(to_address: str, display_name: str, token: str) -> bool:
-    link = f"{settings.android_deep_link_base}/reset-password?token={quote(token, safe='')}"
+    base_url = str(settings.account_action_base_url).rstrip("/")
+    link = f"{base_url}/reset-password?token={quote(token, safe='')}"
     body = (
         f"Hola, {display_name}.\n\n"
         "Recibimos una solicitud para cambiar tu contraseña de Contab Pareja.\n"

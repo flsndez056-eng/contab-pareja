@@ -31,6 +31,14 @@ enum class AppScreen {
     ACCOUNT_SECURITY,
 }
 
+internal fun accountActionPath(scheme: String?, host: String?, path: String?): String? {
+    val supportedOrigin = (scheme == "contabpareja" && host == "auth") ||
+        (scheme == "https" && host == "contab.siptrapollo.online")
+    return path?.takeIf {
+        supportedOrigin && it in setOf("/reset-password", "/verify-email")
+    }
+}
+
 data class MainUiState(
     val screen: AppScreen = AppScreen.AUTH,
     val loading: Boolean = true,
@@ -109,10 +117,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun handleDeepLink(uri: Uri?) {
-        if (uri?.scheme != "contabpareja" || uri.host != "auth") return
-        val token = uri.getQueryParameter("token")?.trim().orEmpty()
+        val safeUri = uri ?: return
+        val path = accountActionPath(safeUri.scheme, safeUri.host, safeUri.path) ?: return
+        val token = safeUri.getQueryParameter("token")?.trim().orEmpty()
         if (token.isBlank()) return
-        when (uri.path) {
+        when (path) {
             "/reset-password" -> showResetPassword(token)
             "/verify-email" -> confirmEmail(token)
         }

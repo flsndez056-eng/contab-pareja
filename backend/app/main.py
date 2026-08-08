@@ -6,7 +6,7 @@ from fastapi import FastAPI, Response, status
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 
-from app.api.routes import auth, couples, devices, expenses
+from app.api.routes import account_links, auth, couples, devices, expenses
 from app.core.config import settings
 from app.db.session import SessionFactory, dispose_engine
 
@@ -42,6 +42,8 @@ if settings.cors_origins:
 
 for route in (auth.router, couples.router, expenses.router, devices.router):
     app.include_router(route, prefix=settings.api_v1_prefix)
+
+app.include_router(account_links.router)
 
 
 @app.get("/health/live", tags=["health"])

@@ -25,12 +25,12 @@ No guardes credenciales reales en Git ni en archivos de ejemplo.
 
 ## Android
 
-El cliente usa Kotlin, Jetpack Compose, Room, WorkManager, Retrofit y Firebase Installation IDs. En debug se conecta por defecto a `http://10.0.2.2:8000/` desde el emulador.
+El cliente usa Kotlin, Jetpack Compose, Room, WorkManager, Retrofit y Firebase Installation IDs. En debug se conecta por defecto a producción; para usar el emulador contra un backend local pasa `-PCONTAB_DEBUG_API_BASE_URL=http://10.0.2.2:8000/`.
 
 1. Abre `android/` en Android Studio.
 2. Para notificaciones, usa la app Android ya registrada en el proyecto Firebase `contab-pareja` y coloca `google-services.json` en `android/app/`.
 3. Ejecuta `./gradlew testDebugUnitTest lintDebug assembleDebug`.
-4. Para instalar una compilación de pruebas en un teléfono real, pasa `-PCONTAB_DEBUG_API_BASE_URL=https://contab.siptrapollo.online/`.
+4. Para instalar una compilación de pruebas en un teléfono real, genera el APK debug; ya apunta a `https://contab.siptrapollo.online/`.
 5. Para release pasa `-PCONTAB_API_BASE_URL=https://contab.siptrapollo.online/`.
 
 ## Producción
