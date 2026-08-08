@@ -8,7 +8,7 @@ import org.junit.Test
 
 class AccountLinkTest {
     @Test
-    fun acceptsCustomSchemeAndVerifiedHttpsOrigins() {
+    fun acceptsCustomSchemeAndExactProductionHttpsPaths() {
         assertEquals(
             "/reset-password",
             accountActionPath("contabpareja", "auth", "/reset-password"),
@@ -18,14 +18,23 @@ class AccountLinkTest {
             accountActionPath(
                 "https",
                 "contab.siptrapollo.online",
-                "/verify-email",
+                "/auth/verify-email",
+            ),
+        )
+        assertEquals(
+            "/reset-password",
+            accountActionPath(
+                "https",
+                "contab.siptrapollo.online",
+                "/auth/reset-password",
             ),
         )
     }
 
     @Test
     fun rejectsUnknownOriginsAndPaths() {
-        assertNull(accountActionPath("https", "example.com", "/reset-password"))
+        assertNull(accountActionPath("https", "example.com", "/auth/reset-password"))
+        assertNull(accountActionPath("https", "contab.siptrapollo.online", "/reset-password"))
         assertNull(accountActionPath("https", "contab.siptrapollo.online", "/other"))
     }
 
