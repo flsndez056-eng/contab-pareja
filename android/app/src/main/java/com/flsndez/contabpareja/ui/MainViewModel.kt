@@ -50,8 +50,33 @@ data class MainUiState(
     val report: ReportSummaryDto? = null,
     val invitationCode: String? = null,
     val resetToken: String = "",
+    val passwordResetRequestSent: Boolean = false,
     val error: String? = null,
     val notice: String? = null,
+)
+
+internal fun shouldPreservePasswordReset(screen: AppScreen): Boolean =
+    screen == AppScreen.RESET_PASSWORD
+
+internal fun signedOutStateAfterBootstrap(current: MainUiState): MainUiState =
+    if (shouldPreservePasswordReset(current.screen)) {
+        current.copy(loading = false, busy = false)
+    } else {
+        MainUiState(loading = false, notice = current.notice)
+    }
+
+internal fun passwordResetRequestSucceeded(
+    current: MainUiState,
+    message: String,
+): MainUiState = current.copy(
+    passwordResetRequestSent = true,
+    notice = message,
+)
+
+internal fun passwordResetSucceeded(): MainUiState = MainUiState(
+    screen = AppScreen.AUTH,
+    loading = false,
+    notice = "Contraseña actualizada. Ya puedes iniciar sesión.",
 )
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
@@ -73,8 +98,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun bootstrap() = launchTask(showBusy = false) {
-        if (!container.authRepository.restoreSession()) {
-            _state.update { MainUiState(loading = false) }
+        val restored = container.authRepository.restoreSession()
+        if (shouldPreservePasswordReset(_state.value.screen)) {
+            _state.update { it.copy(loading = false) }
+            return@launchTask
+        }
+        if (!restored) {
+            _state.update(::signedOutStateAfterBootstrap)
             return@launchTask
         }
         loadAuthenticatedState()
@@ -95,25 +125,33 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun showForgotPassword() = _state.update {
-        it.copy(screen = AppScreen.FORGOT_PASSWORD, error = null)
+        it.copy(
+            screen = AppScreen.FORGOT_PASSWORD,
+            passwordResetRequestSent = false,
+            error = null,
+            notice = null,
+        )
     }
 
     fun showResetPassword(token: String = "") = _state.update {
-        it.copy(screen = AppScreen.RESET_PASSWORD, resetToken = token, error = null)
+        it.copy(
+            screen = AppScreen.RESET_PASSWORD,
+            loading = false,
+            resetToken = token,
+            passwordResetRequestSent = false,
+            error = null,
+            notice = null,
+        )
     }
 
     fun requestPasswordReset(email: String) = launchTask {
         val message = container.authRepository.forgotPassword(email)
-        _state.update { it.copy(notice = message) }
+        _state.update { passwordResetRequestSucceeded(it, message) }
     }
 
     fun resetPassword(token: String, newPassword: String) = launchTask {
         container.authRepository.resetPassword(token, newPassword)
-        _state.value = MainUiState(
-            screen = AppScreen.AUTH,
-            loading = false,
-            notice = "Contraseña actualizada. Ya puedes iniciar sesión.",
-        )
+        _state.value = passwordResetSucceeded()
     }
 
     fun handleDeepLink(uri: Uri?) {
@@ -243,6 +281,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private suspend fun loadAuthenticatedState() {
         val user = container.accountRepository.me()
         val couple = container.coupleRepository.state()
+        if (shouldPreservePasswordReset(_state.value.screen)) {
+            _state.update { it.copy(loading = false) }
+            return
+        }
         _state.update {
             it.copy(
                 loading = false,
@@ -268,7 +310,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun launchTask(showBusy: Boolean = true, block: suspend () -> Unit) {
         viewModelScope.launch {
-            if (showBusy) _state.update { it.copy(busy = true, error = null) }
+            if (showBusy) {
+                _state.update { it.copy(busy = true, error = null, notice = null) }
+            }
             runCatching { block() }
                 .onFailure { throwable ->
                     if (throwable is HttpException && throwable.code() == 401) {
