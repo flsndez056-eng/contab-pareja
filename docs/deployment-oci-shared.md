@@ -45,8 +45,13 @@ chmod 600 .env.production
 Genera valores únicos para `POSTGRES_PASSWORD` y `JWT_SECRET`, y deja `API_HOST_PORT=8100`. Copia la credencial FCM restringida a `secrets/firebase-service-account.json` y protégela:
 
 ```bash
-chmod 600 secrets/firebase-service-account.json
+sudo chown 10001:10001 secrets/firebase-service-account.json
+sudo chmod 600 secrets/firebase-service-account.json
 ```
+
+El contenedor se ejecuta como el usuario no privilegiado `10001`. El propietario anterior debe
+ser `10001`; de lo contrario, el worker arrancará pero Firebase rechazará cada entrega por falta
+de acceso a la credencial.
 
 ## 4. Validar y levantar
 
