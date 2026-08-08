@@ -80,8 +80,10 @@ fun ContabApp(viewModel: MainViewModel) {
         }
     }
 
-    LaunchedEffect(state.notice) {
-        state.notice?.let {
+    val showsInlineNotice = state.screen == AppScreen.AUTH ||
+        state.screen == AppScreen.FORGOT_PASSWORD
+    LaunchedEffect(state.notice, state.screen) {
+        state.notice?.takeUnless { showsInlineNotice }?.let {
             snackbar.showSnackbar(it)
             viewModel.clearNotice()
         }
@@ -93,12 +95,15 @@ fun ContabApp(viewModel: MainViewModel) {
                 state.loading -> LoadingScreen()
                 state.screen == AppScreen.AUTH -> AuthScreen(
                     busy = state.busy,
+                    notice = state.notice,
                     onLogin = viewModel::login,
                     onRegister = viewModel::register,
                     onForgotPassword = viewModel::showForgotPassword,
                 )
                 state.screen == AppScreen.FORGOT_PASSWORD -> ForgotPasswordScreen(
                     busy = state.busy,
+                    notice = state.notice,
+                    requestSent = state.passwordResetRequestSent,
                     onRequest = viewModel::requestPasswordReset,
                     onHaveCode = { viewModel.showResetPassword() },
                     onBack = viewModel::showAuth,
@@ -162,6 +167,7 @@ private fun LoadingScreen() {
 @Composable
 private fun AuthScreen(
     busy: Boolean,
+    notice: String?,
     onLogin: (String, String) -> Unit,
     onRegister: (String, String, String) -> Unit,
     onForgotPassword: () -> Unit,
@@ -183,6 +189,10 @@ private fun AuthScreen(
             style = MaterialTheme.typography.titleMedium,
             color = MaterialTheme.colorScheme.secondary,
         )
+        notice?.let {
+            Spacer(Modifier.height(20.dp))
+            SuccessMessage(it)
+        }
         Spacer(Modifier.height(32.dp))
         if (registering) {
             OutlinedTextField(
@@ -241,17 +251,26 @@ private fun AuthScreen(
 @Composable
 private fun ForgotPasswordScreen(
     busy: Boolean,
+    notice: String?,
+    requestSent: Boolean,
     onRequest: (String) -> Unit,
     onHaveCode: () -> Unit,
     onBack: () -> Unit,
 ) {
     var email by remember { mutableStateOf("") }
+    LaunchedEffect(requestSent) {
+        if (requestSent) email = ""
+    }
     Column(
         Modifier.fillMaxSize().padding(28.dp).verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.Center,
     ) {
         Text("Recupera tu acceso", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
         Text("Te enviaremos un código temporal si el correo está registrado.")
+        if (requestSent && notice != null) {
+            Spacer(Modifier.height(20.dp))
+            SuccessMessage(notice)
+        }
         Spacer(Modifier.height(24.dp))
         OutlinedTextField(
             value = email,
@@ -265,12 +284,29 @@ private fun ForgotPasswordScreen(
             onClick = { onRequest(email) },
             enabled = email.contains('@') && !busy,
             modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
-        ) { Text("Enviar instrucciones") }
+        ) { Text(if (requestSent) "Enviar de nuevo" else "Enviar instrucciones") }
         TextButton(onClick = onHaveCode, enabled = !busy, modifier = Modifier.fillMaxWidth()) {
             Text("Ya tengo un código")
         }
         TextButton(onClick = onBack, enabled = !busy, modifier = Modifier.fillMaxWidth()) {
             Text("Volver al inicio de sesión")
+        }
+    }
+}
+
+@Composable
+private fun SuccessMessage(message: String) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(Icons.Default.Check, contentDescription = null)
+            Spacer(Modifier.width(12.dp))
+            Text(message, modifier = Modifier.weight(1f), fontWeight = FontWeight.Medium)
         }
     }
 }
