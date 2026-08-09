@@ -69,6 +69,7 @@ data class MainUiState(
     val historyStatus: String? = null,
     val historySearch: String = "",
     val historyCategoryId: String? = null,
+    val lastSyncedAt: String? = null,
     val invitation: InvitationDto? = null,
     val pendingInviteToken: String = "",
     val invitePreview: InvitationPreviewDto? = null,
@@ -510,7 +511,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
         container.expenseRepository.sync()
         val report = runCatching { container.expenseRepository.currentMonthReport() }.getOrNull()
-        _state.update { it.copy(report = report, coupleState = couple) }
+        _state.update {
+            it.copy(
+                report = report,
+                coupleState = couple,
+                lastSyncedAt = Instant.now().toString(),
+            )
+        }
     }
 
     private fun registerForPush() {

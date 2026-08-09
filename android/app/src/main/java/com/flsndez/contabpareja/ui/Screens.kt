@@ -37,6 +37,8 @@ import androidx.compose.material.icons.filled.Category
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.Inbox
+import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
@@ -76,6 +78,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -106,7 +109,11 @@ import java.time.format.DateTimeFormatter
 import java.util.Locale
 
 @Composable
-fun ContabApp(viewModel: MainViewModel) {
+fun ContabApp(
+    viewModel: MainViewModel,
+    notificationsEnabled: Boolean,
+    onRequestNotifications: () -> Unit,
+) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
 
@@ -201,6 +208,8 @@ fun ContabApp(viewModel: MainViewModel) {
                 )
                 else -> HomeScreen(
                     state = state,
+                    notificationsEnabled = notificationsEnabled,
+                    onRequestNotifications = onRequestNotifications,
                     onRefresh = viewModel::refresh,
                     onInvite = viewModel::createInvitation,
                     onCreateExpense = viewModel::showCreateExpense,
@@ -798,6 +807,8 @@ private fun RelationshipHistoryScreen(
 @Composable
 private fun HomeScreen(
     state: MainUiState,
+    notificationsEnabled: Boolean,
+    onRequestNotifications: () -> Unit,
     onRefresh: () -> Unit,
     onInvite: () -> Unit,
     onCreateExpense: () -> Unit,
@@ -821,7 +832,18 @@ private fun HomeScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Column { Text(state.coupleState?.couple?.name ?: "Contab Pareja"); Text("Hola, ${state.user?.displayName.orEmpty()}", style = MaterialTheme.typography.labelMedium) } },
+                title = {
+                    Column {
+                        Text(state.coupleState?.couple?.name ?: "Contab Pareja")
+                        Text(
+                            buildString {
+                                append("Hola, ${state.user?.displayName.orEmpty()}")
+                                state.lastSyncedAt?.let { append(" · Al día ${formatTime(it)}") }
+                            },
+                            style = MaterialTheme.typography.labelMedium,
+                        )
+                    }
+                },
                 actions = {
                     IconButton(onClick = onRefresh, enabled = !state.busy) { Icon(Icons.Default.Refresh, "Actualizar") }
                     IconButton(onClick = onSecurity) { Icon(Icons.Default.Settings, "Seguridad") }
@@ -842,6 +864,9 @@ private fun HomeScreen(
             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 100.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
+            if (!notificationsEnabled) {
+                item { NotificationPermissionCard(onRequestNotifications) }
+            }
             item {
                 SummaryCard(state, pendingForMe, onHistory)
             }
@@ -860,11 +885,7 @@ private fun HomeScreen(
             }
             if (homeRequests.isEmpty()) {
                 item {
-                    Text(
-                        "Todavía no hay solicitudes. El primer gasto aparecerá aquí.",
-                        modifier = Modifier.fillMaxWidth().padding(24.dp),
-                        textAlign = TextAlign.Center,
-                    )
+                    EmptyActivityCard(onCreateExpense)
                 }
             }
             items(homeRequests, key = { it.id }) { request ->
@@ -888,6 +909,87 @@ private fun HomeScreen(
                 rejectTarget = null
             },
         )
+    }
+}
+
+@Composable
+private fun NotificationPermissionCard(onEnable: () -> Unit) {
+    Card(
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.tertiary.copy(alpha = .35f)),
+    ) {
+        Row(
+            Modifier.fillMaxWidth().padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Surface(
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.tertiary,
+                modifier = Modifier.size(44.dp),
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        Icons.Default.NotificationsActive,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onTertiary,
+                    )
+                }
+            }
+            Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
+                Text("Activa las decisiones en tiempo real", style = MaterialTheme.typography.titleMedium)
+                Text(
+                    "Recibe al instante las solicitudes, aprobaciones y rechazos, incluso con la app cerrada.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            FilledTonalButton(onClick = onEnable) { Text("Activar") }
+        }
+    }
+}
+
+@Composable
+private fun EmptyActivityCard(onCreateExpense: () -> Unit) {
+    Card(
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = .55f)),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = .55f)),
+    ) {
+        Column(
+            Modifier.fillMaxWidth().padding(26.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Surface(
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.primaryContainer,
+                modifier = Modifier.size(60.dp),
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        Icons.Default.Inbox,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(30.dp),
+                    )
+                }
+            }
+            Text(
+                "Todo está en orden",
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.padding(top = 14.dp),
+            )
+            Text(
+                "Aquí aparecerán las solicitudes del último mes y cualquier decisión pendiente.",
+                textAlign = TextAlign.Center,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 4.dp),
+            )
+            FilledTonalButton(onClick = onCreateExpense, modifier = Modifier.padding(top = 14.dp)) {
+                Icon(Icons.Default.Add, null)
+                Spacer(Modifier.width(8.dp))
+                Text("Crear primera solicitud")
+            }
+        }
     }
 }
 
@@ -968,7 +1070,7 @@ private fun ExpenseHistoryScreen(
     onBack: () -> Unit,
     onApplyFilters: (Int, String?, String, String?) -> Unit,
 ) {
-    var periodDays by remember(state.historyPeriodDays) { mutableStateOf(state.historyPeriodDays) }
+    var periodDays by remember(state.historyPeriodDays) { mutableIntStateOf(state.historyPeriodDays) }
     var status by remember(state.historyStatus) { mutableStateOf(state.historyStatus) }
     var search by remember(state.historySearch) { mutableStateOf(state.historySearch) }
     var categoryId by remember(state.historyCategoryId) { mutableStateOf(state.historyCategoryId) }
@@ -1510,6 +1612,11 @@ private fun formatDateTime(value: String): String = value.toInstantOrNull()
     ?.atZone(ZoneId.systemDefault())
     ?.format(requestDateFormatter)
     ?: value
+
+private fun formatTime(value: String): String = value.toInstantOrNull()
+    ?.atZone(ZoneId.systemDefault())
+    ?.format(DateTimeFormatter.ofPattern("h:mm a", Locale.forLanguageTag("es-DO")))
+    ?: "ahora"
 
 private fun periodLabel(days: Int): String = when (days) {
     30 -> "Últimos 30 días"
