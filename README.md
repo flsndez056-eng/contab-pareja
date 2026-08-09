@@ -8,6 +8,13 @@ La conexión se realiza mediante enlace HTTPS de un solo uso, QR o código tempo
 
 Una solicitud pendiente no es un gasto contable. Solo una decisión válida del otro miembro crea un gasto aprobado. Todas las transiciones quedan auditadas.
 
+## Control financiero
+
+- El inicio resume los gastos aprobados de los últimos 31 días y mantiene visibles las solicitudes pendientes.
+- Cada solicitud muestra monto, categoría, comercio, origen del dinero y fechas de creación, gasto y resolución.
+- El historial permite consultar hasta un año por resultado, categoría, descripción o comercio.
+- Los informes suman exclusivamente gastos aprobados y desglosan cada peso entre categorías y fondos personales o conjuntos.
+
 ## Componentes
 
 - `backend/`: API FastAPI, worker de notificaciones y migraciones Alembic.

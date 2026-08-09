@@ -84,6 +84,10 @@ interface ContabApi {
     suspend fun expenseRequests(
         @Query("box") box: String = "all",
         @Query("status") status: String? = null,
+        @Query("from_date") fromDate: String? = null,
+        @Query("to_date") toDate: String? = null,
+        @Query("category_id") categoryId: String? = null,
+        @Query("q") search: String? = null,
         @Query("limit") limit: Int = 30,
         @Query("offset") offset: Int = 0,
     ): List<ExpenseRequestDto>

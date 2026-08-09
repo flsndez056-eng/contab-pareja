@@ -42,3 +42,10 @@ Monolito modular con una base PostgreSQL. La consistencia del gasto y su aprobac
 - Una solicitud solo cambia desde `pending` una vez.
 - `expense.request_id` es único, por lo que una aprobación no puede duplicar el gasto.
 - Las escrituras móviles repetidas usan `Idempotency-Key`.
+
+## Historial y reportes
+
+- El historial de solicitudes admite rangos de hasta 366 días, paginación, estado, categoría y búsqueda por descripción o comercio.
+- Android pagina las consultas extensas y carga historial y resumen contable en paralelo.
+- Los totales usan el libro inmutable `expenses`; las solicitudes rechazadas o canceladas aparecen en el historial, pero nunca alteran la contabilidad.
+- Los desgloses conservan precisión decimal en PostgreSQL y se agrupan por categoría y origen del pago.

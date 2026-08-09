@@ -51,10 +51,25 @@ async def requests(
         Literal["pending", "approved", "rejected", "cancelled", "expired"] | None,
         Query(alias="status"),
     ] = None,
-    limit: Annotated[int, Query(ge=1, le=100)] = 30,
+    from_date: datetime | None = None,
+    to_date: datetime | None = None,
+    category_id: uuid.UUID | None = None,
+    search: Annotated[str | None, Query(alias="q", min_length=1, max_length=120)] = None,
+    limit: Annotated[int, Query(ge=1, le=500)] = 30,
     offset: Annotated[int, Query(ge=0)] = 0,
 ) -> list[ExpenseRequestResponse]:
-    rows = await service.list_requests(session, current_user.id, box, request_status, limit, offset)
+    rows = await service.list_requests(
+        session,
+        current_user.id,
+        box,
+        request_status,
+        from_date,
+        to_date,
+        category_id,
+        search,
+        limit,
+        offset,
+    )
     return [ExpenseRequestResponse.model_validate(row) for row in rows]
 
 
