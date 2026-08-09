@@ -17,6 +17,8 @@ import com.flsndez.contabpareja.data.remote.UserDto
 import com.google.firebase.messaging.FirebaseMessaging
 import java.time.Instant
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -34,6 +36,7 @@ enum class AppScreen {
     RELATIONSHIP_HISTORY,
     HOME,
     CREATE_EXPENSE,
+    EXPENSE_HISTORY,
     ACCOUNT_SECURITY,
 }
 
@@ -60,6 +63,12 @@ data class MainUiState(
     val requests: List<ExpenseRequestEntity> = emptyList(),
     val categories: List<CategoryEntity> = emptyList(),
     val report: ReportSummaryDto? = null,
+    val expenseHistory: List<ExpenseRequestEntity> = emptyList(),
+    val historyReport: ReportSummaryDto? = null,
+    val historyPeriodDays: Int = 90,
+    val historyStatus: String? = null,
+    val historySearch: String = "",
+    val historyCategoryId: String? = null,
     val invitation: InvitationDto? = null,
     val pendingInviteToken: String = "",
     val invitePreview: InvitationPreviewDto? = null,
@@ -345,6 +354,21 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun showCreateExpense() = _state.update { it.copy(screen = AppScreen.CREATE_EXPENSE) }
     fun showHome() = _state.update { it.copy(screen = AppScreen.HOME) }
 
+    fun showExpenseHistory() = loadExpenseHistory(
+        periodDays = state.value.historyPeriodDays,
+        status = state.value.historyStatus,
+        search = state.value.historySearch,
+        categoryId = state.value.historyCategoryId,
+        openScreen = true,
+    )
+
+    fun applyExpenseHistoryFilters(
+        periodDays: Int,
+        status: String?,
+        search: String,
+        categoryId: String?,
+    ) = loadExpenseHistory(periodDays, status, search, categoryId, openScreen = false)
+
     fun createExpense(
         amount: String,
         description: String,
@@ -378,6 +402,43 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun cancel(requestId: String) = launchTask {
         container.expenseRepository.cancel(requestId)
         refreshData()
+    }
+
+    private fun loadExpenseHistory(
+        periodDays: Int,
+        status: String?,
+        search: String,
+        categoryId: String?,
+        openScreen: Boolean,
+    ) = launchTask {
+        val safePeriod = periodDays.takeIf { it in setOf(30, 90, 180, 365) } ?: 90
+        val safeStatus = status?.takeIf { it == "approved" || it == "rejected" }
+        val to = Instant.now().plus(1, java.time.temporal.ChronoUnit.DAYS)
+        val from = Instant.now().minus(safePeriod.toLong(), java.time.temporal.ChronoUnit.DAYS)
+        val (history, report) = coroutineScope {
+            val historyCall = async {
+                container.expenseRepository.history(
+                    from = from,
+                    to = to,
+                    status = safeStatus,
+                    search = search,
+                    categoryId = categoryId,
+                )
+            }
+            val reportCall = async { container.expenseRepository.report(from, to) }
+            historyCall.await() to reportCall.await()
+        }
+        _state.update {
+            it.copy(
+                screen = if (openScreen) AppScreen.EXPENSE_HISTORY else it.screen,
+                expenseHistory = history,
+                historyReport = report,
+                historyPeriodDays = safePeriod,
+                historyStatus = safeStatus,
+                historySearch = search.trim(),
+                historyCategoryId = categoryId,
+            )
+        }
     }
 
     fun logout() = launchTask {

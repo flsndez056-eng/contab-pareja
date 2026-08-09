@@ -4,7 +4,7 @@ from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
 from fastapi import HTTPException
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import transaction
@@ -257,9 +257,18 @@ async def list_requests(
     user_id: uuid.UUID,
     box: str,
     request_status: str | None,
+    from_date: datetime | None,
+    to_date: datetime | None,
+    category_id: uuid.UUID | None,
+    search: str | None,
     limit: int,
     offset: int,
 ) -> list[ExpenseRequest]:
+    if from_date and to_date:
+        if to_date <= from_date:
+            raise HTTPException(status_code=422, detail="to_date debe ser posterior a from_date.")
+        if to_date - from_date > timedelta(days=366):
+            raise HTTPException(status_code=422, detail="El rango máximo es de 366 días.")
     member = await require_membership(session, user_id)
     query = select(ExpenseRequest).where(ExpenseRequest.couple_id == member.couple_id)
     if box == "inbox":
@@ -268,6 +277,19 @@ async def list_requests(
         query = query.where(ExpenseRequest.requested_by == user_id)
     if request_status:
         query = query.where(ExpenseRequest.status == request_status)
+    if from_date:
+        query = query.where(ExpenseRequest.created_at >= from_date)
+    if to_date:
+        query = query.where(ExpenseRequest.created_at < to_date)
+    if category_id:
+        query = query.where(ExpenseRequest.category_id == category_id)
+    if search and (term := search.strip()):
+        query = query.where(
+            or_(
+                ExpenseRequest.description.icontains(term, autoescape=True),
+                ExpenseRequest.merchant.icontains(term, autoescape=True),
+            )
+        )
     result = await session.scalars(
         query.order_by(ExpenseRequest.created_at.desc(), ExpenseRequest.id.desc())
         .limit(limit)

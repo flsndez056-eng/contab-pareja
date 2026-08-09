@@ -5,7 +5,9 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -18,20 +20,32 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Logout
+import androidx.compose.material.icons.automirrored.filled.ReceiptLong
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material.icons.filled.Category
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Storefront
+import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material.icons.filled.Wallet
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -42,6 +56,7 @@ import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.ExposedDropdownMenuAnchorType
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -65,12 +80,16 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.flsndez.contabpareja.data.local.CategoryEntity
@@ -81,6 +100,10 @@ import com.flsndez.contabpareja.data.remote.InvitationPreviewDto
 import com.flsndez.contabpareja.data.remote.UserDto
 import com.google.zxing.BarcodeFormat
 import com.google.zxing.qrcode.QRCodeWriter
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 
 @Composable
 fun ContabApp(viewModel: MainViewModel) {
@@ -158,6 +181,11 @@ fun ContabApp(viewModel: MainViewModel) {
                     onBack = viewModel::showHome,
                     onSubmit = viewModel::createExpense,
                 )
+                state.screen == AppScreen.EXPENSE_HISTORY -> ExpenseHistoryScreen(
+                    state = state,
+                    onBack = viewModel::showHome,
+                    onApplyFilters = viewModel::applyExpenseHistoryFilters,
+                )
                 state.screen == AppScreen.ACCOUNT_SECURITY -> AccountSecurityScreen(
                     user = state.user,
                     busy = state.busy,
@@ -176,6 +204,7 @@ fun ContabApp(viewModel: MainViewModel) {
                     onRefresh = viewModel::refresh,
                     onInvite = viewModel::createInvitation,
                     onCreateExpense = viewModel::showCreateExpense,
+                    onHistory = viewModel::showExpenseHistory,
                     onDecide = viewModel::decide,
                     onCancel = viewModel::cancel,
                     onLogout = viewModel::logout,
@@ -772,6 +801,7 @@ private fun HomeScreen(
     onRefresh: () -> Unit,
     onInvite: () -> Unit,
     onCreateExpense: () -> Unit,
+    onHistory: () -> Unit,
     onDecide: (String, Boolean, String?) -> Unit,
     onCancel: (String) -> Unit,
     onLogout: () -> Unit,
@@ -780,6 +810,13 @@ private fun HomeScreen(
     var rejectTarget by remember { mutableStateOf<ExpenseRequestEntity?>(null) }
     val userId = state.user?.id
     val pendingForMe = state.requests.count { it.status == "pending" && it.requestedBy != userId }
+    val categoryNames = remember(state.categories) { state.categories.associate { it.id to it.name } }
+    val homeRequests = remember(state.requests) {
+        val cutoff = Instant.now().minusSeconds(31L * 24L * 60L * 60L)
+        state.requests.filter { request ->
+            request.status == "pending" || request.createdAt.toInstantOrNull()?.isAfter(cutoff) == true
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -806,7 +843,7 @@ private fun HomeScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             item {
-                SummaryCard(state, pendingForMe)
+                SummaryCard(state, pendingForMe, onHistory)
             }
             if ((state.coupleState?.members?.size ?: 0) < 2) {
                 item {
@@ -814,9 +851,14 @@ private fun HomeScreen(
                 }
             }
             item {
-                Text("Actividad", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                Text("Actividad reciente", style = MaterialTheme.typography.titleLarge)
+                Text(
+                    "Solicitudes del último mes y todas las pendientes",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
-            if (state.requests.isEmpty()) {
+            if (homeRequests.isEmpty()) {
                 item {
                     Text(
                         "Todavía no hay solicitudes. El primer gasto aparecerá aquí.",
@@ -825,10 +867,11 @@ private fun HomeScreen(
                     )
                 }
             }
-            items(state.requests, key = { it.id }) { request ->
+            items(homeRequests, key = { it.id }) { request ->
                 ExpenseRequestCard(
                     request = request,
                     incoming = request.requestedBy != userId,
+                    categoryName = request.categoryId?.let(categoryNames::get) ?: "Sin categoría",
                     onApprove = { onDecide(request.id, true, null) },
                     onReject = { rejectTarget = request },
                     onCancel = { onCancel(request.id) },
@@ -849,16 +892,284 @@ private fun HomeScreen(
 }
 
 @Composable
-private fun SummaryCard(state: MainUiState, pendingForMe: Int) {
-    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)) {
-        Column(Modifier.fillMaxWidth().padding(20.dp)) {
-            Text("Resumen de los últimos 31 días", style = MaterialTheme.typography.titleMedium)
+private fun SummaryCard(state: MainUiState, pendingForMe: Int, onHistory: () -> Unit) {
+    val scheme = MaterialTheme.colorScheme
+    Card(
+        colors = CardDefaults.cardColors(containerColor = Color.Transparent),
+        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
+    ) {
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .background(
+                    Brush.linearGradient(listOf(scheme.primary, scheme.secondary)),
+                    RoundedCornerShape(24.dp),
+                )
+                .padding(22.dp),
+        ) {
+            Text("BALANCE DEL ÚLTIMO MES", style = MaterialTheme.typography.labelMedium, color = Color.White.copy(alpha = .82f))
             Text(
                 money(state.report?.total ?: "0", state.report?.currency ?: "DOP"),
                 style = MaterialTheme.typography.displaySmall,
-                fontWeight = FontWeight.Bold,
+                color = Color.White,
             )
-            Text("${state.report?.expenseCount ?: 0} gastos aprobados · $pendingForMe esperando tu decisión")
+            Text(
+                "${state.report?.expenseCount ?: 0} aprobados · $pendingForMe esperando tu decisión",
+                color = Color.White.copy(alpha = .88f),
+            )
+            state.report?.categories?.take(3)?.takeIf { it.isNotEmpty() }?.let { categories ->
+                Spacer(Modifier.height(14.dp))
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    categories.forEach { category ->
+                        Surface(
+                            color = Color.White.copy(alpha = .16f),
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.weight(1f),
+                        ) {
+                            Column(Modifier.padding(horizontal = 10.dp, vertical = 8.dp)) {
+                                Text(
+                                    category.categoryName,
+                                    color = Color.White,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                                Text(
+                                    money(category.total, state.report.currency),
+                                    color = Color.White,
+                                    style = MaterialTheme.typography.labelMedium,
+                                    maxLines = 1,
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+            FilledTonalButton(
+                onClick = onHistory,
+                colors = ButtonDefaults.filledTonalButtonColors(
+                    containerColor = Color.White,
+                    contentColor = scheme.primary,
+                ),
+                modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
+            ) {
+                Icon(Icons.Default.History, null)
+                Spacer(Modifier.width(8.dp))
+                Text("Historial y análisis")
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ExpenseHistoryScreen(
+    state: MainUiState,
+    onBack: () -> Unit,
+    onApplyFilters: (Int, String?, String, String?) -> Unit,
+) {
+    var periodDays by remember(state.historyPeriodDays) { mutableStateOf(state.historyPeriodDays) }
+    var status by remember(state.historyStatus) { mutableStateOf(state.historyStatus) }
+    var search by remember(state.historySearch) { mutableStateOf(state.historySearch) }
+    var categoryId by remember(state.historyCategoryId) { mutableStateOf(state.historyCategoryId) }
+    var categoryExpanded by remember { mutableStateOf(false) }
+    val categoryNames = remember(state.categories) { state.categories.associate { it.id to it.name } }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = {
+                    Column {
+                        Text("Historial y análisis")
+                        Text("Hasta 12 meses", style = MaterialTheme.typography.labelMedium)
+                    }
+                },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Volver")
+                    }
+                },
+            )
+        },
+    ) { padding ->
+        LazyColumn(
+            modifier = Modifier.fillMaxSize().padding(padding),
+            contentPadding = PaddingValues(16.dp, 8.dp, 16.dp, 32.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            item { HistoryAccountingCard(state) }
+            item {
+                Card(
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = .6f)),
+                ) {
+                    Column(Modifier.fillMaxWidth().padding(18.dp)) {
+                        Text("Explorar movimientos", style = MaterialTheme.typography.titleMedium)
+                        Text(
+                            "Filtra por período, resultado, categoría o palabras del comercio y descripción.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Spacer(Modifier.height(14.dp))
+                        OutlinedTextField(
+                            value = search,
+                            onValueChange = { search = it.take(120) },
+                            label = { Text("Buscar gasto o comercio") },
+                            leadingIcon = { Icon(Icons.Default.Search, null) },
+                            trailingIcon = if (search.isNotEmpty()) {
+                                { IconButton(onClick = { search = "" }) { Icon(Icons.Default.Close, "Limpiar") } }
+                            } else {
+                                null
+                            },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        Text("Período", style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(top = 14.dp))
+                        listOf(30 to "30 días", 90 to "3 meses", 180 to "6 meses", 365 to "1 año")
+                            .chunked(2)
+                            .forEach { rowOptions ->
+                                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    rowOptions.forEach { option ->
+                                        FilterChip(
+                                            selected = periodDays == option.first,
+                                            onClick = { periodDays = option.first },
+                                            label = { Text(option.second, maxLines = 1) },
+                                            modifier = Modifier.weight(1f),
+                                        )
+                                    }
+                                }
+                            }
+                        Text("Resultado", style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(top = 8.dp))
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            listOf(null to "Todos", "approved" to "Aprobados", "rejected" to "Rechazados").forEach { option ->
+                                FilterChip(
+                                    selected = status == option.first,
+                                    onClick = { status = option.first },
+                                    label = { Text(option.second) },
+                                )
+                            }
+                        }
+                        ExposedDropdownMenuBox(
+                            expanded = categoryExpanded,
+                            onExpandedChange = { categoryExpanded = it },
+                            modifier = Modifier.padding(top = 8.dp),
+                        ) {
+                            OutlinedTextField(
+                                value = categoryId?.let(categoryNames::get) ?: "Todas las categorías",
+                                onValueChange = {},
+                                readOnly = true,
+                                label = { Text("Categoría") },
+                                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(categoryExpanded) },
+                                modifier = Modifier
+                                    .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable)
+                                    .fillMaxWidth(),
+                            )
+                            ExposedDropdownMenu(
+                                expanded = categoryExpanded,
+                                onDismissRequest = { categoryExpanded = false },
+                            ) {
+                                DropdownMenuItem(
+                                    text = { Text("Todas las categorías") },
+                                    onClick = { categoryId = null; categoryExpanded = false },
+                                )
+                                state.categories.forEach { category ->
+                                    DropdownMenuItem(
+                                        text = { Text(category.name) },
+                                        onClick = { categoryId = category.id; categoryExpanded = false },
+                                    )
+                                }
+                            }
+                        }
+                        Button(
+                            onClick = { onApplyFilters(periodDays, status, search, categoryId) },
+                            enabled = !state.busy,
+                            modifier = Modifier.fillMaxWidth().padding(top = 14.dp),
+                        ) {
+                            Icon(Icons.Default.Search, null)
+                            Spacer(Modifier.width(8.dp))
+                            Text("Aplicar filtros")
+                        }
+                    }
+                }
+            }
+            item {
+                Text("${state.expenseHistory.size} solicitudes encontradas", style = MaterialTheme.typography.titleMedium)
+            }
+            if (state.expenseHistory.isEmpty()) {
+                item {
+                    Text(
+                        "No encontramos solicitudes con estos filtros.",
+                        modifier = Modifier.fillMaxWidth().padding(24.dp),
+                        textAlign = TextAlign.Center,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+            items(state.expenseHistory, key = { it.id }) { request ->
+                ExpenseRequestCard(
+                    request = request,
+                    incoming = request.requestedBy != state.user?.id,
+                    categoryName = request.categoryId?.let(categoryNames::get) ?: "Sin categoría",
+                    actionsEnabled = false,
+                    onApprove = {},
+                    onReject = {},
+                    onCancel = {},
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun HistoryAccountingCard(state: MainUiState) {
+    val report = state.historyReport
+    val scheme = MaterialTheme.colorScheme
+    val total = report?.total?.toBigDecimalOrNull() ?: java.math.BigDecimal.ZERO
+    Card(elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)) {
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .background(
+                    Brush.linearGradient(listOf(scheme.primaryContainer, scheme.secondaryContainer)),
+                    RoundedCornerShape(24.dp),
+                )
+                .padding(20.dp),
+        ) {
+            Text("Contabilidad aprobada", style = MaterialTheme.typography.titleLarge)
+            Text(
+                periodLabel(state.historyPeriodDays),
+                style = MaterialTheme.typography.bodySmall,
+                color = scheme.onSurfaceVariant,
+            )
+            Text(
+                money(report?.total ?: "0", report?.currency ?: "DOP"),
+                style = MaterialTheme.typography.displaySmall,
+                color = scheme.primary,
+                modifier = Modifier.padding(top = 4.dp),
+            )
+            Text(
+                "${report?.expenseCount ?: 0} gastos · Personal ${money(report?.personalTotal ?: "0", report?.currency ?: "DOP")} · Conjunta ${money(report?.jointTotal ?: "0", report?.currency ?: "DOP")}",
+                style = MaterialTheme.typography.bodySmall,
+            )
+            report?.categories?.takeIf { it.isNotEmpty() }?.let { categories ->
+                HorizontalDivider(Modifier.padding(vertical = 16.dp), color = scheme.outline.copy(alpha = .25f))
+                Text("Distribución por categorías", style = MaterialTheme.typography.titleMedium)
+                categories.forEachIndexed { index, category ->
+                    val value = category.total.toBigDecimalOrNull() ?: java.math.BigDecimal.ZERO
+                    val fraction = if (total.signum() == 0) 0f else value.divide(total, 4, java.math.RoundingMode.HALF_UP).toFloat()
+                    Column(Modifier.padding(top = if (index == 0) 10.dp else 12.dp)) {
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text(category.categoryName, style = MaterialTheme.typography.bodyMedium)
+                            Text(money(category.total, report.currency), style = MaterialTheme.typography.labelLarge)
+                        }
+                        LinearProgressIndicator(
+                            progress = { fraction.coerceIn(0f, 1f) },
+                            modifier = Modifier.fillMaxWidth().padding(top = 4.dp).height(7.dp),
+                            color = categoryColor(index),
+                            trackColor = scheme.surface.copy(alpha = .65f),
+                        )
+                    }
+                }
+            }
         }
     }
 }
@@ -940,25 +1251,96 @@ private fun copyText(context: Context, label: String, value: String) {
 private fun ExpenseRequestCard(
     request: ExpenseRequestEntity,
     incoming: Boolean,
+    categoryName: String,
+    actionsEnabled: Boolean = true,
     onApprove: () -> Unit,
     onReject: () -> Unit,
     onCancel: () -> Unit,
 ) {
-    Card {
-        Column(Modifier.fillMaxWidth().padding(16.dp)) {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text(request.description, modifier = Modifier.weight(1f), fontWeight = FontWeight.SemiBold)
-                Spacer(Modifier.width(12.dp))
-                Text(money(request.amount, request.currency), fontWeight = FontWeight.Bold)
+    val scheme = MaterialTheme.colorScheme
+    val statusContainer = when (request.status) {
+        "approved" -> Color(0xFFD8F8E4)
+        "rejected" -> scheme.errorContainer
+        "pending" -> Color(0xFFFFE8B8)
+        else -> scheme.surfaceVariant
+    }
+    val statusContent = when (request.status) {
+        "approved" -> Color(0xFF096B3B)
+        "rejected" -> scheme.onErrorContainer
+        "pending" -> Color(0xFF7A4D00)
+        else -> scheme.onSurfaceVariant
+    }
+    Card(
+        border = BorderStroke(1.dp, scheme.outlineVariant.copy(alpha = .55f)),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+    ) {
+        Column(Modifier.fillMaxWidth().padding(18.dp)) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
+                Surface(
+                    color = scheme.primaryContainer,
+                    shape = CircleShape,
+                    modifier = Modifier.size(42.dp),
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(Icons.AutoMirrored.Filled.ReceiptLong, null, tint = scheme.primary)
+                    }
+                }
+                Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
+                    Text(
+                        request.description,
+                        style = MaterialTheme.typography.titleMedium,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Text(
+                        if (incoming) "Solicitud recibida" else "Solicitud enviada",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = scheme.onSurfaceVariant,
+                    )
+                }
+                Column(horizontalAlignment = Alignment.End) {
+                    Text(
+                        money(request.amount, request.currency),
+                        style = MaterialTheme.typography.titleMedium,
+                        color = scheme.primary,
+                    )
+                    Surface(color = statusContainer, shape = RoundedCornerShape(50)) {
+                        Text(
+                            statusLabel(request.status),
+                            color = statusContent,
+                            style = MaterialTheme.typography.labelSmall,
+                            modifier = Modifier.padding(horizontal = 9.dp, vertical = 4.dp),
+                        )
+                    }
+                }
             }
-            request.merchant?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
-            Text(
-                "${if (incoming) "Recibida" else "Enviada"} · ${statusLabel(request.status)} · ${if (request.paymentSource == "joint") "Cuenta conjunta" else "Cuenta personal"}",
-                color = MaterialTheme.colorScheme.secondary,
-                style = MaterialTheme.typography.labelMedium,
+            Spacer(Modifier.height(14.dp))
+            DetailRow(Icons.Default.CalendarMonth, "Solicitada ${formatDateTime(request.createdAt)}")
+            DetailRow(Icons.Default.Schedule, "Gasto previsto ${formatDateTime(request.occurredAt)}")
+            request.resolvedAt?.let {
+                DetailRow(Icons.Default.Check, "Resuelta ${formatDateTime(it)}")
+            }
+            request.merchant?.let { DetailRow(Icons.Default.Storefront, it) }
+            DetailRow(Icons.Default.Category, categoryName)
+            DetailRow(
+                Icons.Default.Wallet,
+                if (request.paymentSource == "joint") "Fondos conjuntos" else "Fondos personales",
             )
-            request.rejectionReason?.let { Text("Motivo: $it", color = MaterialTheme.colorScheme.error) }
-            if (request.status == "pending") {
+            request.rejectionReason?.let {
+                Surface(
+                    color = scheme.errorContainer,
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
+                ) {
+                    Text(
+                        "Motivo del rechazo: $it",
+                        color = scheme.onErrorContainer,
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.padding(12.dp),
+                    )
+                }
+            }
+            if (request.status == "pending" && actionsEnabled) {
                 Row(Modifier.fillMaxWidth().padding(top = 12.dp), horizontalArrangement = Arrangement.End) {
                     if (incoming) {
                         OutlinedButton(onClick = onReject) {
@@ -976,6 +1358,27 @@ private fun ExpenseRequestCard(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun DetailRow(icon: ImageVector, text: String) {
+    Row(
+        Modifier.fillMaxWidth().padding(vertical = 2.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            icon,
+            null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(16.dp),
+        )
+        Text(
+            text,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(start = 8.dp),
+        )
     }
 }
 
@@ -1096,7 +1499,40 @@ private fun statusLabel(status: String): String = when (status) {
     else -> status
 }
 
+private val requestDateFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern(
+    "d MMM yyyy · h:mm a",
+    Locale.forLanguageTag("es-DO"),
+)
+
+private fun String.toInstantOrNull(): Instant? = runCatching { Instant.parse(this) }.getOrNull()
+
+private fun formatDateTime(value: String): String = value.toInstantOrNull()
+    ?.atZone(ZoneId.systemDefault())
+    ?.format(requestDateFormatter)
+    ?: value
+
+private fun periodLabel(days: Int): String = when (days) {
+    30 -> "Últimos 30 días"
+    90 -> "Últimos 3 meses"
+    180 -> "Últimos 6 meses"
+    365 -> "Último año"
+    else -> "Período seleccionado"
+}
+
+private fun categoryColor(index: Int): Color = listOf(
+    Color(0xFF5B4BDB),
+    Color(0xFF00A3B8),
+    Color(0xFFF05A7E),
+    Color(0xFFFF9F43),
+    Color(0xFF2FB574),
+)[index % 5]
+
 private fun money(value: String, currency: String): String {
-    val normalized = value.toBigDecimalOrNull()?.setScale(2)?.toPlainString() ?: value
-    return "$currency $normalized"
+    val amount = value.toBigDecimalOrNull() ?: return "$currency $value"
+    val formatter = java.text.NumberFormat.getNumberInstance(Locale.forLanguageTag("es-DO")).apply {
+        minimumFractionDigits = 2
+        maximumFractionDigits = 2
+        isGroupingUsed = true
+    }
+    return "$currency ${formatter.format(amount)}"
 }

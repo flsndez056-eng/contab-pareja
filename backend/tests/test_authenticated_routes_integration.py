@@ -1,6 +1,6 @@
 import os
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 import httpx
 import pytest
@@ -125,6 +125,39 @@ async def test_authenticated_write_reuses_the_authentication_transaction() -> No
             assert decision.status_code == 200
             assert decision.json()["status"] == "approved"
             assert decision.json()["updated_at"]
+
+            now = datetime.now(UTC)
+            filtered = await client.get(
+                "/api/v1/expense-requests",
+                headers=owner_headers,
+                params={
+                    "status": "approved",
+                    "from_date": (now - timedelta(days=1)).isoformat(),
+                    "to_date": (now + timedelta(days=1)).isoformat(),
+                    "q": "integración",
+                    "limit": 500,
+                },
+            )
+            assert filtered.status_code == 200
+            assert [item["id"] for item in filtered.json()] == [request.json()["id"]]
+
+            no_match = await client.get(
+                "/api/v1/expense-requests",
+                headers=owner_headers,
+                params={"q": "comercio inexistente"},
+            )
+            assert no_match.status_code == 200
+            assert no_match.json() == []
+
+            invalid_range = await client.get(
+                "/api/v1/expense-requests",
+                headers=owner_headers,
+                params={
+                    "from_date": now.isoformat(),
+                    "to_date": (now - timedelta(days=1)).isoformat(),
+                },
+            )
+            assert invalid_range.status_code == 422
 
             ended = await client.post(
                 "/api/v1/couples/current/end",

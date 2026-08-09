@@ -6,6 +6,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import retrofit2.http.HTTP
+import retrofit2.http.Query
 
 class ApiContractTest {
     private val gson = Gson()
@@ -62,5 +63,15 @@ class ApiContractTest {
         assertEquals("DELETE", annotation.method)
         assertEquals("api/v1/account", annotation.path)
         assertTrue(annotation.hasBody)
+    }
+
+    @Test
+    fun expenseHistorySupportsPeriodSearchAndCategoryFilters() {
+        val method = ContabApi::class.java.declaredMethods.single { it.name == "expenseRequests" }
+        val queryNames = method.parameterAnnotations
+            .flatMap { annotations -> annotations.filterIsInstance<Query>() }
+            .map { it.value }
+
+        assertTrue(queryNames.containsAll(listOf("status", "from_date", "to_date", "category_id", "q")))
     }
 }

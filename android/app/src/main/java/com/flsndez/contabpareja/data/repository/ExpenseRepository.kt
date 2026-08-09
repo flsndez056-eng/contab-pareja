@@ -10,6 +10,8 @@ import com.flsndez.contabpareja.data.remote.ReportSummaryDto
 import java.time.Instant
 import java.time.temporal.ChronoUnit
 import java.util.UUID
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
 
 class ExpenseRepository(
@@ -19,9 +21,11 @@ class ExpenseRepository(
     val requests: Flow<List<ExpenseRequestEntity>> = dao.observeRequests()
     val categories = dao.observeCategories()
 
-    suspend fun sync() {
-        val requests = api.expenseRequests(limit = 100)
-        val categories = api.categories()
+    suspend fun sync() = coroutineScope {
+        val requestsCall = async { api.expenseRequests(limit = 100) }
+        val categoriesCall = async { api.categories() }
+        val requests = requestsCall.await()
+        val categories = categoriesCall.await()
         dao.replaceAllRequests(requests.map { it.toEntity() })
         dao.replaceAllCategories(categories.map { it.toEntity() })
     }
@@ -48,6 +52,34 @@ class ExpenseRepository(
         val from = to.minus(31, ChronoUnit.DAYS)
         return api.reportSummary(from.toString(), to.toString())
     }
+
+    suspend fun history(
+        from: Instant,
+        to: Instant,
+        status: String?,
+        search: String,
+        categoryId: String?,
+    ): List<ExpenseRequestEntity> {
+        val pageSize = 200
+        val results = mutableListOf<ExpenseRequestEntity>()
+        var page: List<ExpenseRequestEntity>
+        do {
+            page = api.expenseRequests(
+                status = status,
+                fromDate = from.toString(),
+                toDate = to.toString(),
+                categoryId = categoryId,
+                search = search.trim().ifBlank { null },
+                limit = pageSize,
+                offset = results.size,
+            ).map { it.toEntity() }
+            results += page
+        } while (page.size == pageSize && results.size < 5_000)
+        return results
+    }
+
+    suspend fun report(from: Instant, to: Instant): ReportSummaryDto =
+        api.reportSummary(from.toString(), to.toString())
 
     suspend fun clear() {
         dao.clearRequests()
