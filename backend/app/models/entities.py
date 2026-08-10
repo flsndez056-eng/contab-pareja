@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 from enum import StrEnum
 from typing import Any
@@ -8,6 +8,7 @@ from sqlalchemy import (
     JSON,
     Boolean,
     CheckConstraint,
+    Date,
     DateTime,
     ForeignKey,
     Index,
@@ -260,6 +261,63 @@ class Expense(Base):
         Index("ix_expenses_couple_occurred", "couple_id", "occurred_at"),
         Index("ix_expenses_couple_category", "couple_id", "category_id"),
     )
+
+
+class MonthlyBudget(Base):
+    __tablename__ = "monthly_budgets"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    couple_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("couples.id", ondelete="CASCADE"), index=True
+    )
+    month: Mapped[date] = mapped_column(Date)
+    category_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("categories.id", ondelete="RESTRICT")
+    )
+    limit_amount: Mapped[Decimal] = mapped_column(Numeric(14, 2))
+    currency: Mapped[str] = mapped_column(String(3))
+    created_by: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"))
+    updated_by: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+    __table_args__ = (
+        CheckConstraint("limit_amount > 0", name="positive_limit"),
+        CheckConstraint("length(currency) = 3", name="currency_length"),
+        CheckConstraint("extract(day from month) = 1", name="month_starts_on_first"),
+        Index(
+            "uq_monthly_budgets_scope",
+            "couple_id",
+            "month",
+            "category_id",
+            unique=True,
+            postgresql_nulls_not_distinct=True,
+        ),
+        Index("ix_monthly_budgets_couple_month", "couple_id", "month"),
+    )
+
+
+class ClientErrorReport(Base):
+    __tablename__ = "client_error_reports"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), index=True
+    )
+    couple_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("couples.id", ondelete="SET NULL"), index=True
+    )
+    app_version: Mapped[str] = mapped_column(String(32))
+    error_type: Mapped[str] = mapped_column(String(100))
+    fingerprint: Mapped[str] = mapped_column(String(64), index=True)
+    stack_frames: Mapped[list[str]] = mapped_column(JSON, default=list)
+    screen: Mapped[str | None] = mapped_column(String(50))
+    occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    __table_args__ = (Index("ix_client_error_reports_created", "created_at"),)
 
 
 class Device(Base):

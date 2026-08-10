@@ -21,6 +21,8 @@ def test_openapi_exposes_versioned_product_routes() -> None:
         "/api/v1/expense-requests",
         "/api/v1/expense-requests/{request_id}/decision",
         "/api/v1/reports/summary",
+        "/api/v1/budgets/{month}",
+        "/api/v1/diagnostics/client-errors",
         "/api/v1/devices/current",
         "/health/live",
         "/health/ready",

@@ -11,8 +11,10 @@ from app.schemas.auth import (
     RegisterRequest,
     ResetPasswordRequest,
 )
+from app.schemas.budgets import CategoryBudgetInput, MonthlyBudgetUpdate
 from app.schemas.couples import JoinCoupleRequest
 from app.schemas.devices import RegisterDeviceRequest
+from app.schemas.diagnostics import ClientErrorCreate
 from app.schemas.expenses import CreateExpenseRequest, DecisionRequest
 
 
@@ -96,3 +98,26 @@ def test_account_deletion_requires_explicit_confirmation() -> None:
     assert request.confirmation == "ELIMINAR"
     with pytest.raises(ValidationError):
         DeleteAccountRequest(password="a-secure-password", confirmation="BORRAR")
+
+
+def test_monthly_budget_rejects_duplicate_categories() -> None:
+    category_id = uuid.uuid4()
+    with pytest.raises(ValidationError):
+        MonthlyBudgetUpdate(
+            total_limit=Decimal("1000.00"),
+            categories=[
+                CategoryBudgetInput(category_id=category_id, limit=Decimal("100.00")),
+                CategoryBudgetInput(category_id=category_id, limit=Decimal("200.00")),
+            ],
+        )
+
+
+def test_private_diagnostic_rejects_external_stack_frames() -> None:
+    with pytest.raises(ValidationError):
+        ClientErrorCreate(
+            app_version="0.5.0",
+            error_type="java.lang.IllegalStateException",
+            fingerprint="a" * 64,
+            stack_frames=["com.thirdparty.sdk.SecretFrame.call(Secret.kt:1)"],
+            occurred_at=datetime.now(UTC),
+        )

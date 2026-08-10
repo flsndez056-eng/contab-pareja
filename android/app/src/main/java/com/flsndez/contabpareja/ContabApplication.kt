@@ -18,6 +18,7 @@ class ContabApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        container.privateDiagnostics.install()
         createNotificationChannel()
         scheduleBackgroundSync()
     }

@@ -15,6 +15,8 @@ jobs:
       - name: Validar Docker Compose para OCI
         run: |
           sh -n deploy/oci/backup.sh
+          sh -n deploy/oci/verify-backup.sh
+          sh -n deploy/oci/diagnostics-report.sh
           docker compose --env-file .env.production.example -f compose.oci.yaml config --quiet
           docker compose --env-file .env.production.example -f compose.oci.yaml -f compose.oci-shared.yaml config --quiet
 

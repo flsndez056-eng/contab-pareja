@@ -5,12 +5,14 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
+import android.os.SystemClock
 import android.provider.Settings
-import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
+import androidx.biometric.BiometricManager
+import androidx.biometric.BiometricPrompt
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -18,19 +20,29 @@ import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import androidx.core.content.edit
 import androidx.core.net.toUri
+import androidx.fragment.app.FragmentActivity
+import com.flsndez.contabpareja.core.AppLockMode
+import com.flsndez.contabpareja.core.AppLockStore
 import com.flsndez.contabpareja.ui.ContabApp
 import com.flsndez.contabpareja.ui.MainViewModel
 import com.flsndez.contabpareja.ui.theme.ContabTheme
 
-class MainActivity : ComponentActivity() {
+class MainActivity : FragmentActivity() {
     private val viewModel by viewModels<MainViewModel>()
     private var notificationsEnabled by mutableStateOf(true)
+    private lateinit var appLockStore: AppLockStore
+    private var lockMode by mutableStateOf(AppLockMode.NONE)
+    private var appUnlocked by mutableStateOf(true)
+    private var backgroundedAt: Long? = null
     private val notificationPermission = registerForActivityResult(
         ActivityResultContracts.RequestPermission(),
     ) { notificationsEnabled = notificationsAreEnabled() }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        appLockStore = AppLockStore(this)
+        lockMode = appLockStore.mode
+        appUnlocked = lockMode == AppLockMode.NONE
         enableEdgeToEdge()
         notificationsEnabled = notificationsAreEnabled()
         viewModel.handleDeepLink(intent?.data)
@@ -40,6 +52,13 @@ class MainActivity : ComponentActivity() {
                     viewModel = viewModel,
                     notificationsEnabled = notificationsEnabled,
                     onRequestNotifications = ::requestNotificationAccess,
+                    lockMode = lockMode,
+                    appUnlocked = appUnlocked,
+                    onUnlockWithPin = ::unlockWithPin,
+                    onUnlockWithBiometric = { authenticateBiometric { appUnlocked = true } },
+                    onSetPin = ::setAppPin,
+                    onEnableBiometric = ::enableBiometricLock,
+                    onDisableAppLock = ::disableAppLock,
                 )
             }
         }
@@ -55,6 +74,70 @@ class MainActivity : ComponentActivity() {
         super.onResume()
         notificationsEnabled = notificationsAreEnabled()
         viewModel.onForeground()
+    }
+
+    override fun onStart() {
+        super.onStart()
+        val elapsed = backgroundedAt?.let { SystemClock.elapsedRealtime() - it }
+        if (lockMode != AppLockMode.NONE && elapsed != null && elapsed >= LOCK_AFTER_MILLIS) {
+            appUnlocked = false
+        }
+    }
+
+    override fun onStop() {
+        backgroundedAt = SystemClock.elapsedRealtime()
+        super.onStop()
+    }
+
+    private fun unlockWithPin(pin: String): Boolean = appLockStore.verifyPin(pin).also {
+        if (it) appUnlocked = true
+    }
+
+    private fun setAppPin(pin: String) {
+        appLockStore.setPin(pin)
+        lockMode = AppLockMode.PIN
+        appUnlocked = true
+    }
+
+    private fun enableBiometricLock() {
+        authenticateBiometric {
+            appLockStore.enableBiometric()
+            lockMode = AppLockMode.BIOMETRIC
+            appUnlocked = true
+        }
+    }
+
+    private fun disableAppLock() {
+        appLockStore.disable()
+        lockMode = AppLockMode.NONE
+        appUnlocked = true
+    }
+
+    private fun authenticateBiometric(onSuccess: () -> Unit) {
+        val authenticators = BiometricManager.Authenticators.BIOMETRIC_WEAK or
+            BiometricManager.Authenticators.DEVICE_CREDENTIAL
+        if (BiometricManager.from(this).canAuthenticate(authenticators) !=
+            BiometricManager.BIOMETRIC_SUCCESS
+        ) {
+            return
+        }
+        val prompt = BiometricPrompt(
+            this,
+            ContextCompat.getMainExecutor(this),
+            object : BiometricPrompt.AuthenticationCallback() {
+                override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
+                    super.onAuthenticationSucceeded(result)
+                    onSuccess()
+                }
+            },
+        )
+        prompt.authenticate(
+            BiometricPrompt.PromptInfo.Builder()
+                .setTitle("Desbloquear Contab Pareja")
+                .setSubtitle("Confirma tu identidad para proteger tus finanzas")
+                .setAllowedAuthenticators(authenticators)
+                .build(),
+        )
     }
 
     private fun requestNotificationAccess() {
@@ -88,4 +171,8 @@ class MainActivity : ComponentActivity() {
                     ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) ==
                     PackageManager.PERMISSION_GRANTED
                 )
+
+    private companion object {
+        const val LOCK_AFTER_MILLIS = 30_000L
+    }
 }

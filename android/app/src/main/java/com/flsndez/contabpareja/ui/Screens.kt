@@ -97,6 +97,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.flsndez.contabpareja.data.local.CategoryEntity
 import com.flsndez.contabpareja.data.local.ExpenseRequestEntity
+import com.flsndez.contabpareja.core.AppLockMode
 import com.flsndez.contabpareja.data.remote.CoupleHistoryItemDto
 import com.flsndez.contabpareja.data.remote.InvitationDto
 import com.flsndez.contabpareja.data.remote.InvitationPreviewDto
@@ -113,8 +114,19 @@ fun ContabApp(
     viewModel: MainViewModel,
     notificationsEnabled: Boolean,
     onRequestNotifications: () -> Unit,
+    lockMode: AppLockMode,
+    appUnlocked: Boolean,
+    onUnlockWithPin: (String) -> Boolean,
+    onUnlockWithBiometric: () -> Unit,
+    onSetPin: (String) -> Unit,
+    onEnableBiometric: () -> Unit,
+    onDisableAppLock: () -> Unit,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    if (!appUnlocked && lockMode != AppLockMode.NONE) {
+        AppLockGate(lockMode, onUnlockWithPin, onUnlockWithBiometric)
+        return
+    }
     val snackbar = remember { SnackbarHostState() }
 
     LaunchedEffect(state.error) {
@@ -193,6 +205,12 @@ fun ContabApp(
                     onBack = viewModel::showHome,
                     onApplyFilters = viewModel::applyExpenseHistoryFilters,
                 )
+                state.screen == AppScreen.MONTHLY_CONTROL -> MonthlyControlScreen(
+                    state = state,
+                    onBack = viewModel::showHome,
+                    onChangeMonth = viewModel::changeMonthlyControlMonth,
+                    onSaveBudget = viewModel::saveMonthlyBudget,
+                )
                 state.screen == AppScreen.ACCOUNT_SECURITY -> AccountSecurityScreen(
                     user = state.user,
                     busy = state.busy,
@@ -204,6 +222,10 @@ fun ContabApp(
                     onEndCouple = viewModel::endCouple,
                     onDeleteAccount = viewModel::deleteAccount,
                     onHistory = viewModel::showHistory,
+                    lockMode = lockMode,
+                    onSetPin = onSetPin,
+                    onEnableBiometric = onEnableBiometric,
+                    onDisableAppLock = onDisableAppLock,
                     onBack = viewModel::closeAccountSecurity,
                 )
                 else -> HomeScreen(
@@ -214,6 +236,7 @@ fun ContabApp(
                     onInvite = viewModel::createInvitation,
                     onCreateExpense = viewModel::showCreateExpense,
                     onHistory = viewModel::showExpenseHistory,
+                    onMonthlyControl = viewModel::showMonthlyControl,
                     onDecide = viewModel::decide,
                     onCancel = viewModel::cancel,
                     onLogout = viewModel::logout,
@@ -437,6 +460,10 @@ private fun AccountSecurityScreen(
     onEndCouple: (String) -> Unit,
     onDeleteAccount: (String) -> Unit,
     onHistory: () -> Unit,
+    lockMode: AppLockMode,
+    onSetPin: (String) -> Unit,
+    onEnableBiometric: () -> Unit,
+    onDisableAppLock: () -> Unit,
     onBack: () -> Unit,
 ) {
     var verificationCode by remember { mutableStateOf("") }
@@ -472,6 +499,9 @@ private fun AccountSecurityScreen(
                     modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
                 ) { Text("Confirmar correo") }
             }
+
+            HorizontalDivider(Modifier.padding(vertical = 24.dp))
+            AppLockSettings(lockMode, onSetPin, onEnableBiometric, onDisableAppLock)
 
             HorizontalDivider(Modifier.padding(vertical = 24.dp))
             Text("Cambiar contraseña", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
@@ -813,6 +843,7 @@ private fun HomeScreen(
     onInvite: () -> Unit,
     onCreateExpense: () -> Unit,
     onHistory: () -> Unit,
+    onMonthlyControl: () -> Unit,
     onDecide: (String, Boolean, String?) -> Unit,
     onCancel: (String) -> Unit,
     onLogout: () -> Unit,
@@ -870,6 +901,9 @@ private fun HomeScreen(
             item {
                 SummaryCard(state, pendingForMe, onHistory)
             }
+            item {
+                MonthlyControlEntryCard(onMonthlyControl)
+            }
             if ((state.coupleState?.members?.size ?: 0) < 2) {
                 item {
                     InvitationCard(state.invitation, onInvite)
@@ -909,6 +943,26 @@ private fun HomeScreen(
                 rejectTarget = null
             },
         )
+    }
+}
+
+@Composable
+private fun MonthlyControlEntryCard(onOpen: () -> Unit) {
+    Card(
+        onClick = onOpen,
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
+    ) {
+        Row(
+            Modifier.fillMaxWidth().padding(18.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(Icons.Default.CalendarMonth, null, tint = MaterialTheme.colorScheme.secondary)
+            Column(Modifier.weight(1f).padding(horizontal = 14.dp)) {
+                Text("Presupuesto e informes", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Text("Define límites por categoría y exporta el mes a PDF o CSV.")
+            }
+            Text("Abrir", color = MaterialTheme.colorScheme.secondary, fontWeight = FontWeight.Bold)
+        }
     }
 }
 

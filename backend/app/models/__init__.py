@@ -1,6 +1,7 @@
 from app.models.entities import (
     AuditEvent,
     Category,
+    ClientErrorReport,
     Couple,
     CoupleMember,
     Device,
@@ -9,6 +10,7 @@ from app.models.entities import (
     ExpenseRequest,
     IdempotencyRecord,
     Invitation,
+    MonthlyBudget,
     OutboxEvent,
     RefreshSession,
     User,
@@ -17,6 +19,7 @@ from app.models.entities import (
 __all__ = [
     "AuditEvent",
     "Category",
+    "ClientErrorReport",
     "Couple",
     "CoupleMember",
     "Device",
@@ -25,6 +28,7 @@ __all__ = [
     "ExpenseRequest",
     "IdempotencyRecord",
     "Invitation",
+    "MonthlyBudget",
     "OutboxEvent",
     "RefreshSession",
     "User",

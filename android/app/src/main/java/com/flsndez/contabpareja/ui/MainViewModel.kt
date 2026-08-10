@@ -9,13 +9,18 @@ import com.flsndez.contabpareja.data.local.CategoryEntity
 import com.flsndez.contabpareja.data.local.ExpenseRequestEntity
 import com.flsndez.contabpareja.data.remote.CoupleHistoryItemDto
 import com.flsndez.contabpareja.data.remote.CoupleStateDto
+import com.flsndez.contabpareja.data.remote.CategoryBudgetInputDto
 import com.flsndez.contabpareja.data.remote.CreateExpenseBody
 import com.flsndez.contabpareja.data.remote.InvitationDto
 import com.flsndez.contabpareja.data.remote.InvitationPreviewDto
+import com.flsndez.contabpareja.data.remote.MonthlyBudgetDto
+import com.flsndez.contabpareja.data.remote.MonthlyBudgetUpdateBody
 import com.flsndez.contabpareja.data.remote.ReportSummaryDto
 import com.flsndez.contabpareja.data.remote.UserDto
 import com.google.firebase.messaging.FirebaseMessaging
 import java.time.Instant
+import java.time.YearMonth
+import java.time.ZoneId
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
@@ -38,6 +43,7 @@ enum class AppScreen {
     CREATE_EXPENSE,
     EXPENSE_HISTORY,
     ACCOUNT_SECURITY,
+    MONTHLY_CONTROL,
 }
 
 internal fun accountActionPath(scheme: String?, host: String?, path: String?): String? {
@@ -63,6 +69,10 @@ data class MainUiState(
     val requests: List<ExpenseRequestEntity> = emptyList(),
     val categories: List<CategoryEntity> = emptyList(),
     val report: ReportSummaryDto? = null,
+    val selectedMonth: String = YearMonth.now().toString(),
+    val monthlyBudget: MonthlyBudgetDto? = null,
+    val monthlyReport: ReportSummaryDto? = null,
+    val monthlyExpenses: List<ExpenseRequestEntity> = emptyList(),
     val expenseHistory: List<ExpenseRequestEntity> = emptyList(),
     val historyReport: ReportSummaryDto? = null,
     val historyPeriodDays: Int = 90,
@@ -355,6 +365,29 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun showCreateExpense() = _state.update { it.copy(screen = AppScreen.CREATE_EXPENSE) }
     fun showHome() = _state.update { it.copy(screen = AppScreen.HOME) }
 
+    fun showMonthlyControl() = loadMonthlyControl(_state.value.selectedMonth)
+
+    fun changeMonthlyControlMonth(delta: Long) {
+        val current = YearMonth.now()
+        val candidate = YearMonth.parse(_state.value.selectedMonth).plusMonths(delta)
+        if (candidate > current || candidate < current.minusMonths(23)) return
+        loadMonthlyControl(candidate.toString())
+    }
+
+    fun saveMonthlyBudget(totalLimit: String?, categoryLimits: Map<String, String>) = launchTask {
+        val month = _state.value.selectedMonth
+        val body = MonthlyBudgetUpdateBody(
+            totalLimit = totalLimit?.trim()?.ifBlank { null },
+            categories = categoryLimits.mapNotNull { (categoryId, limit) ->
+                limit.trim().takeIf { it.isNotBlank() }?.let {
+                    CategoryBudgetInputDto(categoryId, it)
+                }
+            },
+        )
+        val budget = container.expenseRepository.updateMonthlyBudget(month, body)
+        _state.update { it.copy(monthlyBudget = budget, notice = "Presupuesto mensual actualizado.") }
+    }
+
     fun showExpenseHistory() = loadExpenseHistory(
         periodDays = state.value.historyPeriodDays,
         status = state.value.historyStatus,
@@ -442,6 +475,32 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    private fun loadMonthlyControl(monthValue: String) = launchTask {
+        val month = YearMonth.parse(monthValue)
+        val zone = runCatching {
+            ZoneId.of(_state.value.coupleState?.couple?.timezone ?: "America/Santo_Domingo")
+        }.getOrDefault(ZoneId.systemDefault())
+        val from = month.atDay(1).atStartOfDay(zone).toInstant()
+        val to = month.plusMonths(1).atDay(1).atStartOfDay(zone).toInstant()
+        val (budget, report, expenses) = coroutineScope {
+            val budgetCall = async { container.expenseRepository.monthlyBudget(monthValue) }
+            val reportCall = async { container.expenseRepository.report(from, to) }
+            val expensesCall = async {
+                container.expenseRepository.history(from, to, "approved", "", null)
+            }
+            Triple(budgetCall.await(), reportCall.await(), expensesCall.await())
+        }
+        _state.update {
+            it.copy(
+                screen = AppScreen.MONTHLY_CONTROL,
+                selectedMonth = monthValue,
+                monthlyBudget = budget,
+                monthlyReport = report,
+                monthlyExpenses = expenses,
+            )
+        }
+    }
+
     fun logout() = launchTask {
         container.authRepository.logout()
         container.expenseRepository.clear()
@@ -456,6 +515,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private suspend fun loadAuthenticatedState() {
         val user = container.accountRepository.me()
+        runCatching { container.privateDiagnostics.uploadPending() }
         val couple = container.coupleRepository.state()
         if (shouldPreservePasswordReset(_state.value.screen)) {
             _state.update { it.copy(loading = false) }

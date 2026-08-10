@@ -124,10 +124,29 @@ Haz ejecutable el script y pruébalo:
 
 ```bash
 chmod +x deploy/oci/backup.sh
+chmod +x deploy/oci/verify-backup.sh
 ./deploy/oci/backup.sh
+./deploy/oci/verify-backup.sh
 ```
 
-Programa una ejecución diaria con `cron` y copia los archivos resultantes a Object Storage u otro destino cifrado fuera de la VM. Un backup que nunca se ha restaurado no se considera verificado.
+Cada copia incluye un SHA-256 y la verificación realiza una restauración real en una base temporal,
+ejecuta comprobaciones mínimas y luego la elimina. El último éxito queda en
+`backups/last-verified.txt`.
+
+Para programarlo a diario con systemd:
+
+```bash
+sudo cp deploy/oci/systemd/contab-backup.* /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now contab-backup.timer
+sudo systemctl start contab-backup.service
+systemctl status contab-backup.service --no-pager
+systemctl list-timers contab-backup.timer --no-pager
+```
+
+Copia además los `.dump` y `.sha256` a un destino cifrado fuera de la VM. La restauración
+automática detecta respaldos truncados o incompatibles, pero una copia externa sigue siendo
+necesaria ante la pérdida total del servidor.
 
 ## 8. Actualizaciones y rollback
 
