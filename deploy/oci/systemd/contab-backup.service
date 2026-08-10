@@ -6,7 +6,7 @@ After=docker.service
 [Service]
 Type=oneshot
 WorkingDirectory=/opt/contab-pareja
-ExecStart=/opt/contab-pareja/deploy/oci/backup.sh
-ExecStart=/opt/contab-pareja/deploy/oci/verify-backup.sh
+ExecStart=/bin/sh /opt/contab-pareja/deploy/oci/backup.sh
+ExecStart=/bin/sh /opt/contab-pareja/deploy/oci/verify-backup.sh
 Nice=10
 IOSchedulingClass=idle
