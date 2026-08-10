@@ -14,6 +14,9 @@ Una solicitud pendiente no es un gasto contable. Solo una decisión válida del 
 - Cada solicitud muestra monto, categoría, comercio, origen del dinero y fechas de creación, gasto y resolución.
 - El historial permite consultar hasta un año por resultado, categoría, descripción o comercio.
 - Los informes suman exclusivamente gastos aprobados y desglosan cada peso entre categorías y fondos personales o conjuntos.
+- Cada mes admite un límite total y límites por categoría; son alertas informativas y no alteran la regla de aprobación mutua.
+- Los informes mensuales se exportan a PDF o CSV mediante el selector privado de archivos de Android.
+- El acceso local puede protegerse con biometría/credencial del teléfono o un PIN que nunca sale del dispositivo.
 
 ## Componentes
 
@@ -49,3 +52,8 @@ El cliente usa Kotlin, Jetpack Compose, Room, WorkManager, Retrofit y Firebase I
 - Recuperación de acceso y sesiones: `docs/identity-access.md`.
 - Despliegue paso a paso en OCI: `docs/deployment-oci.md`.
 - Despliegue sin costo en una instancia OCI compartida: `docs/deployment-oci-shared.md`.
+
+Los fallos Android se registran de forma privada en la propia infraestructura, sin mensajes de
+excepción ni datos financieros. En OCI, `./deploy/oci/diagnostics-report.sh 7` muestra un resumen
+por huella de los últimos siete días. Los respaldos diarios incluyen checksum y restauración real
+de verificación.

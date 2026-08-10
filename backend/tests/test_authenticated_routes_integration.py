@@ -1,6 +1,7 @@
 import os
 import uuid
 from datetime import UTC, datetime, timedelta
+from zoneinfo import ZoneInfo
 
 import httpx
 import pytest
@@ -10,12 +11,14 @@ from app.db.session import SessionFactory
 from app.main import app
 from app.models.entities import (
     AuditEvent,
+    ClientErrorReport,
     Couple,
     CoupleMember,
     Expense,
     ExpenseDecision,
     ExpenseRequest,
     Invitation,
+    MonthlyBudget,
     OutboxEvent,
     User,
 )
@@ -101,6 +104,30 @@ async def test_authenticated_write_reuses_the_authentication_transaction() -> No
             )
             assert joined.status_code == 200
 
+            month = datetime.now(ZoneInfo("America/Santo_Domingo")).strftime("%Y-%m")
+            budget_saved = await client.put(
+                f"/api/v1/budgets/{month}",
+                headers=owner_headers,
+                json={"total_limit": "1000.00", "categories": []},
+            )
+            assert budget_saved.status_code == 200
+            assert budget_saved.json()["total"]["spent"] == "0.00"
+
+            diagnostic = await client.post(
+                "/api/v1/diagnostics/client-errors",
+                headers=owner_headers,
+                json={
+                    "app_version": "0.5.0",
+                    "error_type": "java.lang.IllegalStateException",
+                    "fingerprint": "a" * 64,
+                    "stack_frames": [
+                        "com.flsndez.contabpareja.ui.MainViewModel.refresh(MainViewModel.kt:1)"
+                    ],
+                    "occurred_at": datetime.now(UTC).isoformat(),
+                },
+            )
+            assert diagnostic.status_code == 202
+
             request = await client.post(
                 "/api/v1/expense-requests",
                 headers={**owner_headers, "Idempotency-Key": f"route-{test_id}"},
@@ -125,6 +152,13 @@ async def test_authenticated_write_reuses_the_authentication_transaction() -> No
             assert decision.status_code == 200
             assert decision.json()["status"] == "approved"
             assert decision.json()["updated_at"]
+
+            budget_after_expense = await client.get(
+                f"/api/v1/budgets/{month}", headers=partner_headers
+            )
+            assert budget_after_expense.status_code == 200
+            assert budget_after_expense.json()["total"]["spent"] == "125.50"
+            assert budget_after_expense.json()["total"]["remaining"] == "874.50"
 
             now = datetime.now(UTC)
             filtered = await client.get(
@@ -221,6 +255,12 @@ async def test_authenticated_write_reuses_the_authentication_transaction() -> No
                                 AuditEvent.actor_id.in_(user_ids),
                             )
                         )
+                    )
+                    await session.execute(
+                        delete(ClientErrorReport).where(ClientErrorReport.user_id.in_(user_ids))
+                    )
+                    await session.execute(
+                        delete(MonthlyBudget).where(MonthlyBudget.couple_id == couple_id)
                     )
                     await session.execute(delete(Expense).where(Expense.couple_id == couple_id))
                     await session.execute(

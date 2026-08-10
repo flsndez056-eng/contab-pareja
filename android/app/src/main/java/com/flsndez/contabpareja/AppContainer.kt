@@ -3,6 +3,7 @@ package com.flsndez.contabpareja
 import android.content.Context
 import androidx.room.Room
 import com.flsndez.contabpareja.core.AuthInterceptor
+import com.flsndez.contabpareja.core.PrivateDiagnostics
 import com.flsndez.contabpareja.core.SecureSessionStore
 import com.flsndez.contabpareja.core.SessionMemory
 import com.flsndez.contabpareja.core.TokenAuthenticator
@@ -66,4 +67,5 @@ class AppContainer(context: Context) {
     val accountRepository = AccountRepository(api)
     val expenseRepository = ExpenseRepository(api, database.dao())
     val deviceRepository = DeviceRepository(context, api)
+    val privateDiagnostics = PrivateDiagnostics(context, api)
 }

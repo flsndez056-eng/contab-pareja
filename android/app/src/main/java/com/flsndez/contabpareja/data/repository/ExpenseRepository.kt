@@ -6,6 +6,8 @@ import com.flsndez.contabpareja.data.local.toEntity
 import com.flsndez.contabpareja.data.remote.ContabApi
 import com.flsndez.contabpareja.data.remote.CreateExpenseBody
 import com.flsndez.contabpareja.data.remote.DecisionBody
+import com.flsndez.contabpareja.data.remote.MonthlyBudgetDto
+import com.flsndez.contabpareja.data.remote.MonthlyBudgetUpdateBody
 import com.flsndez.contabpareja.data.remote.ReportSummaryDto
 import java.time.Instant
 import java.time.temporal.ChronoUnit
@@ -80,6 +82,13 @@ class ExpenseRepository(
 
     suspend fun report(from: Instant, to: Instant): ReportSummaryDto =
         api.reportSummary(from.toString(), to.toString())
+
+    suspend fun monthlyBudget(month: String): MonthlyBudgetDto = api.monthlyBudget(month)
+
+    suspend fun updateMonthlyBudget(
+        month: String,
+        body: MonthlyBudgetUpdateBody,
+    ): MonthlyBudgetDto = api.updateMonthlyBudget(month, body)
 
     suspend fun clear() {
         dao.clearRequests()

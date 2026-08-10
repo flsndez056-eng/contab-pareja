@@ -105,6 +105,22 @@ Para respaldar PostgreSQL:
 ```bash
 cd /opt/contab-pareja
 ./deploy/oci/backup.sh
+./deploy/oci/verify-backup.sh
 ```
+
+Los scripts solo operan sobre el servicio `postgres` del proyecto Compose `contab-pareja-production`:
+no reinician ni modifican los contenedores de Fondo. Para automatizar la copia y una restauración
+temporal diaria, instala las unidades de `deploy/oci/systemd/` como se explica en
+[`deployment-oci.md`](deployment-oci.md#7-copias-de-seguridad).
+
+Para consultar el monitoreo privado sin exponer datos a servicios externos:
+
+```bash
+chmod +x deploy/oci/diagnostics-report.sh
+./deploy/oci/diagnostics-report.sh 7
+```
+
+El resultado agrupa tipo, versión y huella del error. No contiene correos, mensajes de excepción
+ni contenido de solicitudes o gastos.
 
 No abras los puertos `8100`, `8000` ni `5432` en OCI o en el sistema operativo. Revisa periódicamente `docker stats`, `df -h` y la fecha de expiración del certificado.

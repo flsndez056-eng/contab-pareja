@@ -142,6 +142,50 @@ data class ReportSummaryDto(
     val categories: List<CategoryTotalDto>,
 )
 
+data class CategoryBudgetInputDto(
+    @SerializedName("category_id") val categoryId: String,
+    val limit: String,
+)
+
+data class MonthlyBudgetUpdateBody(
+    @SerializedName("total_limit") val totalLimit: String?,
+    val categories: List<CategoryBudgetInputDto>,
+)
+
+data class BudgetAmountStatusDto(
+    val limit: String?,
+    val spent: String,
+    val remaining: String?,
+    @SerializedName("used_percent") val usedPercent: String?,
+    val exceeded: Boolean,
+)
+
+data class CategoryBudgetStatusDto(
+    @SerializedName("category_id") val categoryId: String?,
+    @SerializedName("category_name") val categoryName: String,
+    val limit: String?,
+    val spent: String,
+    val remaining: String?,
+    @SerializedName("used_percent") val usedPercent: String?,
+    val exceeded: Boolean,
+)
+
+data class MonthlyBudgetDto(
+    val month: String,
+    val currency: String,
+    val total: BudgetAmountStatusDto,
+    val categories: List<CategoryBudgetStatusDto>,
+)
+
+data class ClientErrorBody(
+    @SerializedName("app_version") val appVersion: String,
+    @SerializedName("error_type") val errorType: String,
+    val fingerprint: String,
+    @SerializedName("stack_frames") val stackFrames: List<String>,
+    val screen: String?,
+    @SerializedName("occurred_at") val occurredAt: String,
+)
+
 data class RegisterDeviceBody(
     @SerializedName("installation_id") val installationId: String,
     @SerializedName("fcm_registration_id") val fcmRegistrationId: String,

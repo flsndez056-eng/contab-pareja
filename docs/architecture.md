@@ -30,6 +30,8 @@ Monolito modular con una base PostgreSQL. La consistencia del gasto y su aprobac
 - `accounts`: baja, anonimización y revocación total de acceso.
 - `expenses`: solicitudes, decisiones y libro aprobado.
 - `reports`: agregaciones exclusivamente de gastos aprobados.
+- `budgets`: límites mensuales informativos por pareja y categoría.
+- `diagnostics`: huellas técnicas sanitizadas con retención máxima de 30 días.
 - `devices`: instalaciones Android y Firebase Installation IDs (FID).
 - `outbox`: entrega recuperable de eventos.
 
@@ -49,3 +51,12 @@ Monolito modular con una base PostgreSQL. La consistencia del gasto y su aprobac
 - Android pagina las consultas extensas y carga historial y resumen contable en paralelo.
 - Los totales usan el libro inmutable `expenses`; las solicitudes rechazadas o canceladas aparecen en el historial, pero nunca alteran la contabilidad.
 - Los desgloses conservan precisión decimal en PostgreSQL y se agrupan por categoría y origen del pago.
+- Los límites nunca aprueban, rechazan ni bloquean un gasto: la decisión del otro miembro sigue siendo obligatoria.
+
+## Privacidad operativa
+
+- Android conserva como máximo un fallo pendiente y elimina mensajes, causas textuales y frames ajenos a la app.
+- La API limita la frecuencia, valida las fechas y solo conserva diagnósticos durante 30 días.
+- Los errores del servidor registran identificador de petición, método y ruta, nunca cuerpos ni query strings.
+- `deploy/oci/diagnostics-report.sh` agrupa fallos por huella dentro de PostgreSQL; no usa un tercero.
+- Cada respaldo tiene SHA-256 y se restaura diariamente en una base temporal antes de marcarse como verificado.

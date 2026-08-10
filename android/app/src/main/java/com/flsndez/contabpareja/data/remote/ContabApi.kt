@@ -107,6 +107,18 @@ interface ContabApi {
         @Query("to_date") toDate: String,
     ): ReportSummaryDto
 
+    @GET("api/v1/budgets/{month}")
+    suspend fun monthlyBudget(@Path("month") month: String): MonthlyBudgetDto
+
+    @PUT("api/v1/budgets/{month}")
+    suspend fun updateMonthlyBudget(
+        @Path("month") month: String,
+        @Body body: MonthlyBudgetUpdateBody,
+    ): MonthlyBudgetDto
+
+    @POST("api/v1/diagnostics/client-errors")
+    suspend fun submitClientError(@Body body: ClientErrorBody): Response<Unit>
+
     @PUT("api/v1/devices/current")
     suspend fun registerDevice(@Body body: RegisterDeviceBody): DeviceDto
 
