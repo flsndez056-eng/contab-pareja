@@ -123,10 +123,8 @@ Para pruebas controladas en teléfonos físicos, puedes generar temporalmente un
 Haz ejecutable el script y pruébalo:
 
 ```bash
-chmod +x deploy/oci/backup.sh
-chmod +x deploy/oci/verify-backup.sh
-./deploy/oci/backup.sh
-./deploy/oci/verify-backup.sh
+sh deploy/oci/backup.sh
+sh deploy/oci/verify-backup.sh
 ```
 
 Cada copia incluye un SHA-256 y la verificación realiza una restauración real en una base temporal,
