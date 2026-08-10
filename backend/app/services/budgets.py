@@ -40,18 +40,30 @@ def month_bounds(month: date, timezone: str) -> tuple[datetime, datetime]:
 
 
 def amount_status(limit: Decimal | None, spent: Decimal) -> BudgetAmountStatus:
-    remaining = limit - spent if limit is not None else None
+    money_precision = Decimal("0.01")
+    normalized_spent = spent.quantize(money_precision, rounding=ROUND_HALF_UP)
+    normalized_limit = (
+        limit.quantize(money_precision, rounding=ROUND_HALF_UP) if limit is not None else None
+    )
+    remaining = (
+        (normalized_limit - normalized_spent).quantize(
+            money_precision,
+            rounding=ROUND_HALF_UP,
+        )
+        if normalized_limit is not None
+        else None
+    )
     used_percent = None
-    if limit is not None:
-        used_percent = (spent * Decimal(100) / limit).quantize(
+    if normalized_limit is not None:
+        used_percent = (normalized_spent * Decimal(100) / normalized_limit).quantize(
             Decimal("0.1"), rounding=ROUND_HALF_UP
         )
     return BudgetAmountStatus(
-        limit=limit,
-        spent=spent,
+        limit=normalized_limit,
+        spent=normalized_spent,
         remaining=remaining,
         used_percent=used_percent,
-        exceeded=limit is not None and spent > limit,
+        exceeded=normalized_limit is not None and normalized_spent > normalized_limit,
     )
 
 
