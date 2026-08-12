@@ -1,4 +1,4 @@
-# Contab Pareja
+# DúoCuenta
 
 Aplicación móvil para que dos miembros de una pareja soliciten, aprueben y auditen gastos compartidos.
 

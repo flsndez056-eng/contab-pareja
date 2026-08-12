@@ -1,1 +1,1 @@
-"""Contab Pareja backend."""
+"""DúoCuenta backend."""

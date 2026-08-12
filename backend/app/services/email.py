@@ -55,13 +55,13 @@ async def send_verification_email(to_address: str, display_name: str, token: str
     link = f"{base_url}/verify-email?token={quote(token, safe='')}"
     body = (
         f"Hola, {display_name}.\n\n"
-        "Confirma tu correo de Contab Pareja abriendo este enlace:\n"
+        "Confirma tu correo de DúoCuenta abriendo este enlace:\n"
         f"{link}\n\n"
         f"También puedes copiar este código en la aplicación:\n{token}\n\n"
         f"El código vence en {settings.email_verification_hours} horas. "
         "Si no creaste esta cuenta, ignora el mensaje."
     )
-    return await send_account_email(to_address, "Confirma tu correo de Contab Pareja", body)
+    return await send_account_email(to_address, "Confirma tu correo de DúoCuenta", body)
 
 
 async def send_password_reset_email(to_address: str, display_name: str, token: str) -> bool:
@@ -69,10 +69,10 @@ async def send_password_reset_email(to_address: str, display_name: str, token: s
     link = f"{base_url}/reset-password?token={quote(token, safe='')}"
     body = (
         f"Hola, {display_name}.\n\n"
-        "Recibimos una solicitud para cambiar tu contraseña de Contab Pareja.\n"
+        "Recibimos una solicitud para cambiar tu contraseña de DúoCuenta.\n"
         f"Abre este enlace:\n{link}\n\n"
         f"También puedes copiar este código en la aplicación:\n{token}\n\n"
         f"El código vence en {settings.password_reset_minutes} minutos. "
         "Si no solicitaste el cambio, ignora el mensaje."
     )
-    return await send_account_email(to_address, "Recupera tu acceso a Contab Pareja", body)
+    return await send_account_email(to_address, "Recupera tu acceso a DúoCuenta", body)

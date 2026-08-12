@@ -37,7 +37,7 @@ def notification_copy(event_type: str) -> tuple[str, str]:
         "couple.joined": ("Pareja conectada", "Tu pareja aceptó la invitación."),
         "couple.ended": ("Conexión finalizada", "La relación quedó archivada para ambos."),
     }
-    return messages.get(event_type, ("Contab Pareja", "Hay una actualización pendiente."))
+    return messages.get(event_type, ("DúoCuenta", "Hay una actualización pendiente."))
 
 
 def classify_delivery_failures(

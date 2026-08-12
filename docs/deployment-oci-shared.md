@@ -1,6 +1,6 @@
 # Despliegue en una instancia OCI compartida
 
-Esta variante mantiene costo cero al reutilizar la VM, la IP pública, Nginx y Certbot existentes. Contab Pareja conserva su propio PostgreSQL y su propia red Docker, pero no ocupa directamente los puertos públicos `80` y `443`.
+Esta variante mantiene costo cero al reutilizar la VM, la IP pública, Nginx y Certbot existentes. DúoCuenta conserva su propio PostgreSQL y su propia red Docker, pero no ocupa directamente los puertos públicos `80` y `443`.
 
 ## Diseño
 

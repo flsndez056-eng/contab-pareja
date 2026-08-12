@@ -14,5 +14,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "ContabPareja"
+rootProject.name = "DuoCuenta"
 include(":app")

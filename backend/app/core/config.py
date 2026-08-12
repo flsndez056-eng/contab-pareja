@@ -15,7 +15,7 @@ class Settings(BaseSettings):
     )
 
     app_env: Literal["development", "test", "staging", "production"] = "development"
-    app_name: str = "Contab Pareja API"
+    app_name: str = "DúoCuenta API"
     api_v1_prefix: str = "/api/v1"
     database_url: str
     jwt_secret: str = Field(min_length=64)

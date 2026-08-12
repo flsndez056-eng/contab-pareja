@@ -40,7 +40,7 @@ class ContabMessagingService : FirebaseMessagingService() {
             "expense.approved" -> "Gasto aprobado"
             "expense.rejected" -> "Solicitud rechazada"
             "expense.cancelled" -> "Solicitud cancelada"
-            else -> "Contab Pareja"
+            else -> "DúoCuenta"
         }
         val intent = Intent(this, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
