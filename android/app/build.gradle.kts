@@ -26,8 +26,8 @@ android {
         applicationId = "com.flsndez.contabpareja"
         minSdk = 23
         targetSdk = 37
-        versionCode = 10
-        versionName = "1.0.0-rc1"
+        versionCode = 11
+        versionName = "1.0.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true
