@@ -43,7 +43,7 @@ fun AppLockGate(
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Text("Contab Pareja", style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Bold)
+        Text("DúoCuenta", style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Bold)
         Text(
             "Tus finanzas están protegidas",
             textAlign = TextAlign.Center,

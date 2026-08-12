@@ -1,5 +1,5 @@
 [Unit]
-Description=Contab Pareja - respaldo y restauración de verificación
+Description=DúoCuenta - respaldo y restauración de verificación
 Requires=docker.service
 After=docker.service
 

@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">Contab Pareja</string>
+    <string name="app_name">DúoCuenta</string>
     <string name="notification_channel_name">Solicitudes de gastos</string>
     <string name="notification_channel_description">Avisos privados para aprobar o rechazar gastos</string>
 </resources>

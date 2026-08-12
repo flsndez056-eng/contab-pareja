@@ -133,7 +133,7 @@ class MainActivity : FragmentActivity() {
         )
         prompt.authenticate(
             BiometricPrompt.PromptInfo.Builder()
-                .setTitle("Desbloquear Contab Pareja")
+                .setTitle("Desbloquear DúoCuenta")
                 .setSubtitle("Confirma tu identidad para proteger tus finanzas")
                 .setAllowedAuthenticators(authenticators)
                 .build(),

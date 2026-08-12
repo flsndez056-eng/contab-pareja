@@ -278,7 +278,7 @@ private fun AuthScreen(
         Modifier.fillMaxSize().padding(28.dp).verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.Center,
     ) {
-        Text("Contab Pareja", style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.Bold)
+        Text("DúoCuenta", style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.Bold)
         Text(
             "Cada gasto importante, decidido entre los dos.",
             style = MaterialTheme.typography.titleMedium,
@@ -865,7 +865,7 @@ private fun HomeScreen(
             TopAppBar(
                 title = {
                     Column {
-                        Text(state.coupleState?.couple?.name ?: "Contab Pareja")
+                        Text(state.coupleState?.couple?.name ?: "DúoCuenta")
                         Text(
                             buildString {
                                 append("Hola, ${state.user?.displayName.orEmpty()}")
@@ -1364,11 +1364,11 @@ private fun InvitationCard(invitation: InvitationDto?, onInvite: () -> Unit) {
                 ) { Text("Compartir invitación") }
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedButton(
-                        onClick = { copyText(context, "Enlace de Contab Pareja", invitation.inviteUrl) },
+                        onClick = { copyText(context, "Enlace de DúoCuenta", invitation.inviteUrl) },
                         modifier = Modifier.weight(1f),
                     ) { Text("Copiar enlace") }
                     OutlinedButton(
-                        onClick = { copyText(context, "Código de Contab Pareja", invitation.code) },
+                        onClick = { copyText(context, "Código de DúoCuenta", invitation.code) },
                         modifier = Modifier.weight(1f),
                     ) { Text("Copiar código") }
                 }
@@ -1392,8 +1392,8 @@ private fun createQrBitmap(value: String): Bitmap {
 private fun shareInvitation(context: Context, url: String) {
     val intent = Intent(Intent.ACTION_SEND).apply {
         type = "text/plain"
-        putExtra(Intent.EXTRA_SUBJECT, "Invitación a Contab Pareja")
-        putExtra(Intent.EXTRA_TEXT, "Conecta tu cuenta conmigo en Contab Pareja: $url")
+        putExtra(Intent.EXTRA_SUBJECT, "Invitación a DúoCuenta")
+        putExtra(Intent.EXTRA_TEXT, "Conecta tu cuenta conmigo en DúoCuenta: $url")
     }
     context.startActivity(Intent.createChooser(intent, "Compartir invitación"))
 }

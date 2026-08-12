@@ -83,7 +83,7 @@ object ReportExporter {
         }
 
         newPage()
-        line("Contab Pareja", title, 30f)
+        line("DúoCuenta", title, 30f)
         line("Informe mensual · $month", heading, 24f)
         line("Total aprobado: ${report.total} ${report.currency}", heading, 24f)
         line("Resumen por categoría", heading, 21f)

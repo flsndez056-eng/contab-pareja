@@ -23,10 +23,10 @@ _SECURITY_HEADERS = {
 def _action_page(token: str, action: str) -> HTMLResponse:
     if action == "reset-password":
         title = "Recuperar acceso"
-        description = "Abre Contab Pareja para elegir una contraseña nueva."
+        description = "Abre DúoCuenta para elegir una contraseña nueva."
     else:
         title = "Verificar correo"
-        description = "Abre Contab Pareja para confirmar tu dirección de correo."
+        description = "Abre DúoCuenta para confirmar tu dirección de correo."
 
     encoded_token = quote(token, safe="")
     deep_link = f"{settings.android_deep_link_base}/{action}?token={encoded_token}"
@@ -38,7 +38,7 @@ def _action_page(token: str, action: str) -> HTMLResponse:
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="light dark">
-  <title>{title} · Contab Pareja</title>
+  <title>{title} · DúoCuenta</title>
   <style>
     :root {{ font-family: system-ui, sans-serif; color: #172033; background: #f3f6fb; }}
     body {{
@@ -73,7 +73,7 @@ def _action_page(token: str, action: str) -> HTMLResponse:
   <main>
     <h1>{title}</h1>
     <p>{description}</p>
-    <a class="button" href="{safe_deep_link}">Abrir Contab Pareja</a>
+    <a class="button" href="{safe_deep_link}">Abrir DúoCuenta</a>
     <p>Si la aplicación no se abre, copia este código y pégalo en la pantalla correspondiente:</p>
     <code>{safe_token}</code>
     <p><small>Por seguridad, el código vence y solo puede utilizarse una vez.</small></p>
@@ -93,7 +93,7 @@ def _invite_page(token: str) -> HTMLResponse:
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="light dark">
-  <title>Invitación · Contab Pareja</title>
+  <title>Invitación · DúoCuenta</title>
   <style>
     :root {{ font-family: system-ui, sans-serif; color: #172033; background: #f3f6fb; }}
     body {{
@@ -121,9 +121,9 @@ def _invite_page(token: str) -> HTMLResponse:
 </head>
 <body>
   <main>
-    <h1>Te invitaron a Contab Pareja</h1>
+    <h1>Te invitaron a DúoCuenta</h1>
     <p>Abre la aplicación para revisar quién te invita antes de conectar las cuentas.</p>
-    <a class="button" href="{safe_deep_link}">Abrir Contab Pareja</a>
+    <a class="button" href="{safe_deep_link}">Abrir DúoCuenta</a>
     <p><small>
       La invitación vence, solo puede utilizarse una vez y siempre requiere tu confirmación.
     </small></p>
